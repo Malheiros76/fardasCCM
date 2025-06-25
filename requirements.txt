@@ -1,0 +1,7 @@
+streamlit
+pandas
+reportlab
+python-docx
+urllib3
+email-validator
+pymongo
