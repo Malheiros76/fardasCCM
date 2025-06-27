@@ -8,8 +8,9 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 import smtplib
 from email.mime.text import MIMEText
+import os
 
-# --- Configurar MongoDB ---
+# --- CONFIGURAÇÃO DE MONGO ---
 client = MongoClient("mongodb+srv://bibliotecaluizcarlos:terra166@cluster0.uyvqnek.mongodb.net/?retryWrites=true&w=majority")
 db = client["fardasDB"]
 
@@ -18,8 +19,10 @@ cadastro_col = db["cadastro"]
 produtos_col = db["produtos"]
 movimentacao_col = db["movimentacao"]
 alunos_col = db["alunos"]
+movimentacao_aluno_col = db["movimentacao_aluno"]
 
-# --- Funções Auxiliares ---
+# --- FUNÇÕES AUXILIARES ---
+
 def autenticar(usuario, senha):
     return usuarios_col.find_one({"usuario": usuario, "senha": senha}) is not None
 
@@ -50,7 +53,7 @@ def enviar_email(destinatario, mensagem):
         msg['To'] = destinatario
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login('bibliotecaluizcarlos@gmail.com', 'terra166')  # Altere para senha de app se necessário
+            server.login('bibliotecaluizcarlos@gmail.com', 'terra166') # ajuste para senha de app se necessário
             server.send_message(msg)
     except Exception as e:
         st.error(f"Erro ao enviar email: {e}")
@@ -79,18 +82,20 @@ def calcular_estoque():
             "produto": r["_id"],
             "entrada": r["entrada"],
             "saida": r["saida"],
-            "saldo": saldo,
+            "saldo": saldo
         })
     return pd.DataFrame(lista)
 
-# --- Interface ---
-st.set_page_config(page_title="Sistema de Fardas", layout="centered")
-st.title("Controle de Fardas")
+# --- INÍCIO DO APP ---
+st.set_page_config(page_title="Sistema de Fardas", layout="wide")
+
+st.title("Sistema de Controle de Fardas")
 
 if "logado" not in st.session_state:
     st.session_state.logado = False
 
 if not st.session_state.logado:
+    st.subheader("Login do Sistema")
     with st.form("login"):
         usuario = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
@@ -99,7 +104,7 @@ if not st.session_state.logado:
                 st.session_state.logado = True
                 st.rerun()
             else:
-                st.error("Usuário ou senha inválido")
+                st.error("Usuário ou senha inválidos.")
 else:
     mensagens = alerta_estoque()
     for msg in mensagens:
@@ -112,156 +117,24 @@ else:
                 enviar_whatsapp(cadastro["telefone"], msg)
 
     menu = st.sidebar.selectbox(
-        "Menu", 
+        "Menu",
         [
-            "Cadastro Geral", 
-            "Movimentação", 
-            "Estoque", 
-            "Relatórios", 
-            "Importar Estoque", 
-            "Alunos", 
-            "Importar Alunos"
+            "Cadastro Geral",
+            "Movimentação",
+            "Estoque",
+            "Relatórios",
+            "Importar Estoque",
+            "Alunos",
+            "Consultar Aluno",
+            "Importar Alunos",
+            "🚪 Sair do Sistema"
         ]
     )
 
-    # ------------------------------
-    # NOVA ABA: ALUNOS
-    # ------------------------------
-   elif menu == "Alunos":
-    st.subheader("Pagamento de Material (Vestuário) para os Alunos")
-
-    alunos = list(alunos_col.find())
-    nomes_alunos = [a["nome"] for a in alunos]
-
-    aluno_selecionado = st.selectbox("ALUNO:", nomes_alunos)
-
-    if aluno_selecionado:
-        aluno_doc = alunos_col.find_one({"nome": aluno_selecionado})
-        st.write(f"**Turma:** {aluno_doc.get('turma','')}")
-
-        st.write("### FARDAMENTO PAGO:")
-
-        pecas = list(produtos_col.find())
-
-        # Exibir grade estilo imagem
-        linhas = []
-        linha = []
-        qtd_inputs = {}
-
-        for idx, peca in enumerate(pecas):
-            img_url = peca.get("imagem_url", None)
-
-            # Cada item da grade
-            item = st.container()
-            with item:
-                col1, col2 = st.columns([1, 1])
-
-                if img_url:
-                    with col1:
-                        st.image(img_url, width=100)
-                else:
-                    with col1:
-                        st.write(peca["produto"])
-
-                with col2:
-                    qtd = st.number_input(
-                        f"Qtd {peca['produto']}",
-                        min_value=0,
-                        step=1,
-                        key=f"qtd_{peca['produto']}"
-                    )
-                    qtd_inputs[peca["produto"]] = qtd
-
-            linha.append(item)
-
-            if (idx + 1) % 2 == 0:
-                linhas.append(linha)
-                linha = []
-
-        if linha:
-            linhas.append(linha)
-
-        # Botão para salvar
-        if st.button("Salvar Pagamento de Fardas"):
-            for produto, qtd in qtd_inputs.items():
-                if qtd > 0:
-                    movimentacao_col.insert_one({
-                        "data": datetime.now().strftime("%Y-%m-%d"),
-                        "tipo": "Saída",
-                        "funcionario": aluno_selecionado,
-                        "produto": produto,
-                        "quantidade": qtd
-                    })
-                    produtos_col.update_one({"produto": produto}, {"$set": {"produto": produto}}, upsert=True)
-            st.success("Registro de pagamento salvo com sucesso!")
-
-        st.write("---")
-        st.write("### Histórico de peças pagas para o aluno:")
-
-        historico = list(movimentacao_col.find({
-            "funcionario": aluno_selecionado,
-            "tipo": "Saída"
-        }))
-
-        if historico:
-            df_hist = pd.DataFrame(historico)
-            st.dataframe(df_hist[["data", "produto", "quantidade"]])
-
-            st.write("### Devolver peça ao estoque")
-            for i, row in df_hist.iterrows():
-                if st.button(f"Devolver {row['produto']} ({row['quantidade']})", key=f"devolver_{i}"):
-                    movimentacao_col.insert_one({
-                        "data": datetime.now().strftime("%Y-%m-%d"),
-                        "tipo": "Entrada",
-                        "funcionario": aluno_selecionado,
-                        "produto": row["produto"],
-                        "quantidade": row["quantidade"]
-                    })
-                    st.success(f"Peça {row['produto']} devolvida ao estoque.")
-        else:
-            st.info("Nenhuma peça registrada para este aluno.")
-
-
-    # ------------------------------
-    # NOVA ABA: IMPORTAR ALUNOS
-    # ------------------------------
-    elif menu == "Importar Alunos":
-        st.subheader("Importação de Alunos via Arquivo")
-
-        arquivo = st.file_uploader("Escolha o arquivo .txt ou .csv", type=["txt", "csv"])
-        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
-
-        if arquivo is not None:
-            delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
-            try:
-                df_import = pd.read_csv(arquivo, delimiter=delimitador_real)
-                st.dataframe(df_import)
-                if st.button("Importar alunos"):
-                    erros = []
-                    for _, row in df_import.iterrows():
-                        try:
-                            alunos_col.insert_one({
-                                "cgm": str(row["cgm"]),
-                                "nome": str(row["nome"]),
-                                "turma": str(row["turma"]),
-                                "telefone": str(row.get("telefone", ""))
-                            })
-                        except Exception as e:
-                            erros.append(f"Erro na linha {row.to_dict()}: {e}")
-                    if erros:
-                        st.error("Erros durante a importação:")
-                        for erro in erros:
-                            st.error(erro)
-                    else:
-                        st.success("Importação concluída com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao processar arquivo: {e}")
-
-    # ---- ABA EXISTENTES DO SISTEMA
-    elif menu == "Cadastro Geral":
-        # (mantém igual ao seu código)
+    # --- ABA CADASTRO GERAL ---
+    if menu == "Cadastro Geral":
         st.subheader("Cadastro de Funcionários")
-        with st.form("cadastro"):
+        with st.form("cadastro_func"):
             nome = st.text_input("Nome")
             setor = st.text_input("Setor")
             funcao = st.text_input("Função")
@@ -276,13 +149,12 @@ else:
                         "email": email,
                         "telefone": telefone
                     })
-                    st.success("Cadastrado com sucesso!")
+                    st.success("Funcionário cadastrado!")
                 else:
-                    st.error("Todos os campos são obrigatórios")
+                    st.error("Todos os campos são obrigatórios.")
 
+    # --- ABA MOVIMENTAÇÃO ---
     elif menu == "Movimentação":
-        # (mantém igual ao seu código original)
-
         st.subheader("Entrada e Saída de Produtos")
         with st.form("movimento"):
             data = st.date_input("Data", datetime.now())
@@ -293,7 +165,7 @@ else:
             produto = st.selectbox("Produto", produtos_cadastrados if produtos_cadastrados else ["Nenhum produto cadastrado"])
             quantidade = st.number_input("Quantidade", min_value=1, step=1)
             if st.form_submit_button("Registrar"):
-                if data and tipo and funcionario and produto and quantidade:
+                if funcionario and produto and quantidade:
                     movimentacao_col.insert_one({
                         "data": data.strftime("%Y-%m-%d"),
                         "tipo": tipo,
@@ -303,107 +175,159 @@ else:
                     })
                     produtos_col.update_one({"produto": produto}, {"$set": {"produto": produto}}, upsert=True)
                     st.success("Movimentação registrada!")
-                else:
-                    st.error("Todos os campos são obrigatórios")
 
+    # --- ABA ESTOQUE ---
     elif menu == "Estoque":
         st.subheader("Estoque Atual")
         df = calcular_estoque()
         if not df.empty:
-            def situacao(row):
-                limite = row['entrada'] * 0.2
-                if row['saldo'] <= 0:
-                    return '🔴 Crítico'
-                elif row['saldo'] < limite:
-                    return '🟡 Atenção'
-                else:
-                    return '🟢 OK'
-            df['situação'] = df.apply(situacao, axis=1)
+            df["situação"] = df.apply(
+                lambda row: "🔴 Crítico" if row["saldo"] <= 0 else (
+                    "🟡 Atenção" if row["saldo"] < row["entrada"] * 0.2 else "🟢 OK"
+                ), axis=1
+            )
             st.dataframe(df)
         else:
             st.info("Nenhum dado de movimentação encontrado.")
 
+    # --- ABA RELATÓRIOS ---
     elif menu == "Relatórios":
-        st.subheader("Relatórios")
-        opcao = st.selectbox("Tipo de Relatório", ["Por Quantidade", "Por Local", "Por Funcionário"])
+        st.subheader("Relatórios de Estoque")
         df = calcular_estoque()
         if df.empty:
             st.info("Nenhum dado para gerar relatório.")
         else:
-            def situacao(row):
-                limite = row['entrada'] * 0.2
-                if row['saldo'] <= 0:
-                    return '🔴 Crítico'
-                elif row['saldo'] < limite:
-                    return '🟡 Atenção'
-                else:
-                    return '🟢 OK'
-            df['situação'] = df.apply(situacao, axis=1)
-            filtro_produto = st.multiselect("Filtrar por produto", options=df['produto'].tolist())
-            filtro_situacao = st.multiselect("Filtrar por situação", options=df['situação'].unique().tolist())
-            if filtro_produto:
-                df = df[df['produto'].isin(filtro_produto)]
-            if filtro_situacao:
-                df = df[df['situação'].isin(filtro_situacao)]
-            st.bar_chart(df.set_index("produto")["saldo"])
             st.dataframe(df)
             if st.button("Gerar PDF"):
                 nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
                 cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
                 cpdf.setFont("Helvetica-Bold", 16)
-                cpdf.drawString(2*cm, 28*cm, "Relatório de Estoque de Fardas")
-                cpdf.setFont("Helvetica", 12)
+                cpdf.drawString(2*cm, 28*cm, "Relatório de Estoque")
                 y = 26*cm
                 for i, row in df.iterrows():
-                    texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']} - Situação: {row['situação']}"
+                    texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']}"
                     cpdf.drawString(2*cm, y, texto)
                     y -= 0.6*cm
                     if y < 2*cm:
                         cpdf.showPage()
                         y = 28*cm
-                cpdf.drawString(2*cm, 2.5*cm, "Assinatura do responsável: __________________________")
-                cpdf.drawRightString(19*cm, 2.5*cm, datetime.now().strftime("Gerado em: %d/%m/%Y"))
                 cpdf.save()
                 with open(nome_pdf, "rb") as f:
-                    st.download_button("Baixar Relatório", f, file_name=nome_pdf)
+                    st.download_button("Baixar PDF", f, file_name=nome_pdf)
 
+    # --- ABA IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
-        st.subheader("Importar Estoque via Arquivo .TXT ou .CSV")
-        arquivo = st.file_uploader("Escolha o arquivo .txt ou .csv", type=["txt", "csv"])
+        st.subheader("Importar Estoque via TXT ou CSV")
+        arquivo = st.file_uploader("Arquivo", type=["txt", "csv"])
         delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
-        if arquivo is not None:
+        if arquivo:
             delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
             try:
-                df_import = pd.read_csv(arquivo, delimiter=delimitador_real)
-                st.dataframe(df_import)
-                if st.button("Importar para o Sistema"):
-                    erros = []
-                    for _, row in df_import.iterrows():
-                        try:
-                            produto = str(row['produto'])
-                            tipo = str(row['tipo'])
-                            data = str(row['data'])
-                            funcionario = str(row['funcionario'])
-                            quantidade = int(row['quantidade'])
-                            if cadastro_col.find_one({"nome": funcionario}) is None:
-                                erros.append(f"Funcionário '{funcionario}' não cadastrado.")
-                                continue
-                            movimentacao_col.insert_one({
-                                "data": data,
-                                "tipo": tipo,
-                                "funcionario": funcionario,
-                                "produto": produto,
-                                "quantidade": quantidade
-                            })
-                            produtos_col.update_one({"produto": produto}, {"$set": {"produto": produto}}, upsert=True)
-                        except Exception as erro:
-                            erros.append(f"Erro na linha: {row.to_dict()} - Erro: {erro}")
-                    if erros:
-                        st.error("Algumas linhas não foram importadas:")
-                        for e in erros:
-                            st.error(e)
-                    else:
-                        st.success("Importação concluída com sucesso!")
+                df = pd.read_csv(arquivo, delimiter=delimitador_real)
+                st.dataframe(df)
+                if st.button("Importar"):
+                    for _, row in df.iterrows():
+                        movimentacao_col.insert_one({
+                            "data": str(row.get("data", datetime.now().strftime("%Y-%m-%d"))),
+                            "tipo": row.get("tipo"),
+                            "funcionario": row.get("funcionario"),
+                            "produto": row.get("produto"),
+                            "quantidade": int(row.get("quantidade", 0))
+                        })
+                        produtos_col.update_one({"produto": row.get("produto")}, {"$set": {"produto": row.get("produto")}}, upsert=True)
+                    st.success("Importação concluída!")
             except Exception as e:
-                st.error(f"Erro ao ler o arquivo: {e}")
+                st.error(f"Erro ao importar arquivo: {e}")
 
+    # --- ABA ALUNOS ---
+    elif menu == "Alunos":
+        st.subheader("Registro de Entrega de Fardas aos Alunos")
+        alunos = list(alunos_col.find())
+        nomes_alunos = [a["nome"] for a in alunos] if alunos else []
+        aluno_nome = st.selectbox("Aluno", nomes_alunos)
+        turma = ""
+        cgm = ""
+        if aluno_nome:
+            aluno_data = alunos_col.find_one({"nome": aluno_nome})
+            turma = aluno_data.get("turma", "")
+            cgm = aluno_data.get("cgm", "")
+        st.text(f"CGM: {cgm}")
+        st.text(f"Turma: {turma}")
+        pecas = [
+            "boina.png",
+            "calça_farda.png",
+            "camisa.png",
+            "camisa_farda.png",
+            "conjunto_abrigo.png",
+            "jaqueta_farda.png",
+            "moleton_abrigo.png"
+        ]
+        entrega = {}
+        cols = st.columns(4)
+        for idx, peca in enumerate(pecas):
+            with cols[idx % 4]:
+                img_path = os.path.join("images", peca)
+                if os.path.exists(img_path):
+                    st.image(img_path, width=100)
+                qtd = st.number_input(f"{peca}", min_value=0, step=1, key=f"qtd_{peca}")
+                entrega[peca] = qtd
+        if st.button("Salvar Entrega"):
+            for peca, qtd in entrega.items():
+                if qtd > 0:
+                    movimentacao_aluno_col.insert_one({
+                        "aluno": aluno_nome,
+                        "cgm": cgm,
+                        "turma": turma,
+                        "peca": peca,
+                        "quantidade": qtd,
+                        "data": datetime.now().strftime("%Y-%m-%d")
+                    })
+            st.success("Registro salvo com sucesso!")
+
+    # --- CONSULTAR ALUNO ---
+    elif menu == "Consultar Aluno":
+        st.subheader("Consulta de Entregas de Fardas por Aluno")
+        alunos = list(alunos_col.find())
+        nomes_alunos = [a["nome"] for a in alunos] if alunos else []
+        aluno_nome = st.selectbox("Selecione o aluno", nomes_alunos)
+        if aluno_nome:
+            registros = list(movimentacao_aluno_col.find({"aluno": aluno_nome}))
+            if registros:
+                df = pd.DataFrame(registros)
+                st.dataframe(df[["peca", "quantidade", "data"]])
+                if st.button("Devolver todas as peças"):
+                    movimentacao_aluno_col.delete_many({"aluno": aluno_nome})
+                    st.success("Peças devolvidas ao estoque.")
+            else:
+                st.info("Nenhum registro encontrado para este aluno.")
+
+    # --- IMPORTAR ALUNOS ---
+    elif menu == "Importar Alunos":
+        st.subheader("Importar Alunos via TXT ou CSV")
+        arquivo = st.file_uploader("Arquivo de alunos", type=["txt", "csv"])
+        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
+        if arquivo:
+            delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
+            try:
+                df_alunos = pd.read_csv(arquivo, delimiter=delimitador_real)
+                st.dataframe(df_alunos)
+                if st.button("Importar Alunos"):
+                    for _, row in df_alunos.iterrows():
+                        alunos_col.update_one(
+                            {"cgm": str(row["cgm"])},
+                            {
+                                "$set": {
+                                    "nome": str(row["nome"]),
+                                    "turma": str(row["turma"])
+                                }
+                            },
+                            upsert=True
+                        )
+                    st.success("Alunos importados com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao importar arquivo: {e}")
+
+    # --- SAIR ---
+    elif menu == "🚪 Sair do Sistema":
+        st.session_state.logado = False
+        st.rerun()
