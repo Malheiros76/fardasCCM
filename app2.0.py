@@ -127,78 +127,100 @@ else:
     # ------------------------------
     # NOVA ABA: ALUNOS
     # ------------------------------
-    if menu == "Alunos":
-        st.subheader("Controle de Entrega para Alunos")
+   elif menu == "Alunos":
+    st.subheader("Pagamento de Material (Vestuário) para os Alunos")
 
-        # Lista de alunos cadastrados
-        alunos = list(alunos_col.find())
-        nomes = [a["nome"] for a in alunos]
+    alunos = list(alunos_col.find())
+    nomes_alunos = [a["nome"] for a in alunos]
 
-        aluno_selecionado = st.selectbox("Selecione o aluno", nomes)
+    aluno_selecionado = st.selectbox("ALUNO:", nomes_alunos)
 
-        if aluno_selecionado:
-            aluno = alunos_col.find_one({"nome": aluno_selecionado})
-            st.write(f"**CGM:** {aluno['cgm']}")
-            st.write(f"**Turma:** {aluno['turma']}")
+    if aluno_selecionado:
+        aluno_doc = alunos_col.find_one({"nome": aluno_selecionado})
+        st.write(f"**Turma:** {aluno_doc.get('turma','')}")
 
-            st.write("---")
-            st.write("### Entrega de Peças:")
+        st.write("### FARDAMENTO PAGO:")
 
-            pecas = list(produtos_col.find())
-            quantidades = {}
+        pecas = list(produtos_col.find())
 
-            cols = st.columns(len(pecas))
-            for i, peca in enumerate(pecas):
-                with cols[i]:
-                    # Se tiver campo imagem_url no produto, mostre a imagem
-                    if "imagem_url" in peca:
-                        st.image(peca["imagem_url"], width=100)
-                    st.write(peca["produto"])
-                    quantidades[peca["produto"]] = st.number_input(
+        # Exibir grade estilo imagem
+        linhas = []
+        linha = []
+        qtd_inputs = {}
+
+        for idx, peca in enumerate(pecas):
+            img_url = peca.get("imagem_url", None)
+
+            # Cada item da grade
+            item = st.container()
+            with item:
+                col1, col2 = st.columns([1, 1])
+
+                if img_url:
+                    with col1:
+                        st.image(img_url, width=100)
+                else:
+                    with col1:
+                        st.write(peca["produto"])
+
+                with col2:
+                    qtd = st.number_input(
                         f"Qtd {peca['produto']}",
                         min_value=0,
                         step=1,
                         key=f"qtd_{peca['produto']}"
                     )
+                    qtd_inputs[peca["produto"]] = qtd
 
-            if st.button("Salvar entrega"):
-                for produto, qtd in quantidades.items():
-                    if qtd > 0:
-                        movimentacao_col.insert_one({
-                            "data": datetime.now().strftime("%Y-%m-%d"),
-                            "tipo": "Saída",
-                            "funcionario": aluno_selecionado,
-                            "produto": produto,
-                            "quantidade": qtd
-                        })
-                        produtos_col.update_one({"produto": produto}, {"$set": {"produto": produto}}, upsert=True)
-                st.success("Entrega registrada!")
+            linha.append(item)
 
-            st.write("---")
-            st.write("### Histórico de peças entregues ao aluno:")
+            if (idx + 1) % 2 == 0:
+                linhas.append(linha)
+                linha = []
 
-            historico = list(movimentacao_col.find({
-                "funcionario": aluno_selecionado,
-                "tipo": "Saída"
-            }))
+        if linha:
+            linhas.append(linha)
 
-            if historico:
-                df_hist = pd.DataFrame(historico)
-                st.dataframe(df_hist[["data", "produto", "quantidade"]])
+        # Botão para salvar
+        if st.button("Salvar Pagamento de Fardas"):
+            for produto, qtd in qtd_inputs.items():
+                if qtd > 0:
+                    movimentacao_col.insert_one({
+                        "data": datetime.now().strftime("%Y-%m-%d"),
+                        "tipo": "Saída",
+                        "funcionario": aluno_selecionado,
+                        "produto": produto,
+                        "quantidade": qtd
+                    })
+                    produtos_col.update_one({"produto": produto}, {"$set": {"produto": produto}}, upsert=True)
+            st.success("Registro de pagamento salvo com sucesso!")
 
-                st.write("### Devolver peça ao estoque")
-                for i, row in df_hist.iterrows():
-                    if st.button(f"Devolver {row['produto']} ({row['quantidade']})", key=f"devolver_{i}"):
-                        movimentacao_col.insert_one({
-                            "data": datetime.now().strftime("%Y-%m-%d"),
-                            "tipo": "Entrada",
-                            "funcionario": aluno_selecionado,
-                            "produto": row["produto"],
-                            "quantidade": row["quantidade"]
-                        })
-                        st.success(f"Peça {row['produto']} devolvida ao estoque.")
-            else:
-                st.info("Nenhuma peça registrada para este aluno.")
+        st.write("---")
+        st.write("### Histórico de peças pagas para o aluno:")
+
+        historico = list(movimentacao_col.find({
+            "funcionario": aluno_selecionado,
+            "tipo": "Saída"
+        }))
+
+        if historico:
+            df_hist = pd.DataFrame(historico)
+            st.dataframe(df_hist[["data", "produto", "quantidade"]])
+
+            st.write("### Devolver peça ao estoque")
+            for i, row in df_hist.iterrows():
+                if st.button(f"Devolver {row['produto']} ({row['quantidade']})", key=f"devolver_{i}"):
+                    movimentacao_col.insert_one({
+                        "data": datetime.now().strftime("%Y-%m-%d"),
+                        "tipo": "Entrada",
+                        "funcionario": aluno_selecionado,
+                        "produto": row["produto"],
+                        "quantidade": row["quantidade"]
+                    })
+                    st.success(f"Peça {row['produto']} devolvida ao estoque.")
+        else:
+            st.info("Nenhuma peça registrada para este aluno.")
+
 
     # ------------------------------
     # NOVA ABA: IMPORTAR ALUNOS
