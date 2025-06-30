@@ -112,13 +112,13 @@ if "logado" not in st.session_state:
 
 if not st.session_state.logado:
     st.subheader("Login do Sistema")
-    with st.form("login_form"):
+    with st.form("login"):
         usuario = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
         if st.form_submit_button("Entrar"):
             if autenticar(usuario.strip(), senha.strip()):
                 st.session_state.logado = True
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
 else:
@@ -446,4 +446,4 @@ else:
     elif menu == "🚪 Sair do Sistema":
         st.session_state.logado = False
         st.success("Sessão encerrada.")
-        st.rerun()
+        st.experimental_rerun()
