@@ -379,40 +379,55 @@ else:
                 st.error(f"Erro ao importar arquivo: {e}")
 
     # --- ABA CADASTRO DE USUÁRIOS ---
-    elif menu == "Cadastro de Usuários":
-        st.subheader("Cadastro e Gerenciamento de Usuários")
+elif menu == "Cadastro de Usuários":
+    st.subheader("Cadastro e Gerenciamento de Usuários")
 
-        usuarios = list(usuarios_col.find({}, {"_id":0, "usuario":1, "nivel":1}))
-        df_usuarios = pd.DataFrame(usuarios)
+    # Buscar usuários no banco
+    usuarios = list(usuarios_col.find({}, {"_id": 0, "usuario": 1, "nivel": 1}))
+
+    if usuarios:
+        # Garantir campos existentes para não dar erro no DataFrame
+        usuarios_formatados = [
+            {
+                "usuario": u.get("usuario", ""),
+                "nivel": u.get("nivel", "user")
+            }
+            for u in usuarios
+        ]
+        df_usuarios = pd.DataFrame(usuarios_formatados)
         st.dataframe(df_usuarios)
+    else:
+        st.info("Nenhum usuário cadastrado ainda.")
 
-        with st.form("form_cadastro_usuario"):
-            novo_usuario = st.text_input("Novo usuário")
-            nova_senha = st.text_input("Senha", type="password")
-            nivel = st.selectbox("Nível", ["admin", "user"])
-            submit = st.form_submit_button("Cadastrar")
+    st.markdown("---")
+    st.markdown("### Novo Usuário")
 
-            if submit:
-                novo_usuario = novo_usuario.strip()
-                nova_senha = nova_senha.strip()
-                if novo_usuario and nova_senha:
-                    if usuarios_col.find_one({"usuario": novo_usuario}):
-                        st.warning("Usuário já existe!")
-                    else:
-                        senha_hash = hash_senha(nova_senha).decode('utf-8')
-                        usuarios_col.insert_one({
-                            "usuario": novo_usuario,
-                            "senha": senha_hash,
-                            "nivel": nivel
-                        })
-                        st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
-                        st.experimental_rerun()
+    with st.form("form_cadastro_usuario"):
+        novo_usuario = st.text_input("Novo usuário")
+        nova_senha = st.text_input("Senha", type="password")
+        nivel = st.selectbox("Nível", ["admin", "user"])
+        submit = st.form_submit_button("Cadastrar")
+
+        if submit:
+            if novo_usuario and nova_senha:
+                # Verificar se usuário já existe
+                if usuarios_col.find_one({"usuario": novo_usuario}):
+                    st.warning("Usuário já existe!")
                 else:
-                    st.error("Usuário e senha são obrigatórios.")
+                    usuarios_col.insert_one({
+                        "usuario": novo_usuario,
+                        "senha": nova_senha,
+                        "nivel": nivel
+                    })
+                    st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
+                    st.rerun()
+            else:
+                st.error("Usuário e senha são obrigatórios.")
+
 
     # --- SAIR ---
     elif menu == "🚪 Sair do Sistema":
         st.session_state.logado = False
         st.session_state.pop('usuario_logado', None)
         st.session_state.pop('nivel_usuario', None)
-        st.experimental_rerun()
+        st.rerun()
