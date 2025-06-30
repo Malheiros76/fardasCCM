@@ -107,7 +107,7 @@ if not st.session_state.logado:
         if st.form_submit_button("Entrar"):
             if autenticar(usuario, senha):
                 st.session_state.logado = True
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
 else:
