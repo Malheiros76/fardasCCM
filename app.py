@@ -408,6 +408,35 @@ elif menu == "Consultar Aluno":
                 st.success("Peças devolvidas ao estoque.")
         else:
             st.info("Nenhum registro encontrado para este aluno.")
+            # --- ABA IMPORTAR ALUNOS ---
+    elif menu == "Importar Alunos":
+        st.subheader("Importar Alunos via TXT ou CSV")
+    
+        arquivo = st.file_uploader("Arquivo de alunos", type=["txt", "csv"])
+        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
+    
+        if arquivo:
+            delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
+            try:
+                df_alunos = pd.read_csv(arquivo, delimiter=delimitador_real)
+                st.dataframe(df_alunos)
+    
+                if st.button("Importar Alunos"):
+                    for _, row in df_alunos.iterrows():
+                        alunos_col.update_one(
+                            {"cgm": str(row["cgm"])},
+                            {
+                                "$set": {
+                                    "nome": str(row["nome"]),
+                                    "turma": str(row["turma"]),
+                                    "sexo": str(row.get("sexo", ""))   # Novo campo
+                                }
+                            },
+                            upsert=True
+                        )
+                    st.success("Alunos importados com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao importar arquivo: {e}")
     # --- CADASTRO DE USUÁRIOS ---
     elif menu == "Cadastro de Usuários":
         st.subheader("Cadastro e Gerenciamento de Usuários")
