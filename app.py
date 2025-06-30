@@ -352,7 +352,7 @@ else:
             else:
                 st.info("Nenhum registro encontrado para este aluno.")
 
-       elif menu == "Importar Alunos":
+      if menu == "Importar Alunos":
         st.subheader("Importar Alunos via TXT ou CSV")
         arquivo = st.file_uploader("Arquivo de alunos", type=["txt", "csv"])
     delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
