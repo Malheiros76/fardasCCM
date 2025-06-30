@@ -24,7 +24,12 @@ movimentacao_aluno_col = db["movimentacao_aluno"]
 # --- FUNÇÕES AUXILIARES ---
 
 def autenticar(usuario, senha):
-    return usuarios_col.find_one({"usuario": usuario, "senha": senha}) is not None
+    user = usuarios_col.find_one({"usuario": usuario, "senha": senha})
+    if user:
+        st.session_state['usuario_logado'] = usuario
+        st.session_state['nivel_usuario'] = user.get("nivel", "user")
+        return True
+    return False
 
 def alerta_estoque():
     pipeline = [
@@ -102,7 +107,7 @@ if not st.session_state.logado:
         if st.form_submit_button("Entrar"):
             if autenticar(usuario, senha):
                 st.session_state.logado = True
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
 else:
@@ -116,9 +121,22 @@ else:
             if cadastro.get("telefone"):
                 enviar_whatsapp(cadastro["telefone"], msg)
 
-    menu = st.sidebar.selectbox(
-        "Menu",
-        [
+    # Menu com controle de acesso
+    if st.session_state.get("nivel_usuario") == "admin":
+        opcoes_menu = [
+            "Cadastro Geral",
+            "Movimentação",
+            "Estoque",
+            "Relatórios",
+            "Importar Estoque",
+            "Alunos",
+            "Consultar Aluno",
+            "Importar Alunos",
+            "Cadastro de Usuários",
+            "🚪 Sair do Sistema"
+        ]
+    else:
+        opcoes_menu = [
             "Cadastro Geral",
             "Movimentação",
             "Estoque",
@@ -129,7 +147,8 @@ else:
             "Importar Alunos",
             "🚪 Sair do Sistema"
         ]
-    )
+
+    menu = st.sidebar.selectbox("Menu", opcoes_menu)
 
     # --- ABA CADASTRO GERAL ---
     if menu == "Cadastro Geral":
@@ -201,16 +220,28 @@ else:
             if st.button("Gerar PDF"):
                 nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
                 cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
+                # Cabeçalho com logo e título
+                try:
+                    cpdf.drawImage("CABEÇARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
+                except:
+                    pass
                 cpdf.setFont("Helvetica-Bold", 16)
-                cpdf.drawString(2*cm, 28*cm, "Relatório de Estoque")
-                y = 26*cm
+                cpdf.drawString(2*cm, 24*cm, "Relatório de Estoque")
+                y = 22*cm
                 for i, row in df.iterrows():
                     texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']}"
                     cpdf.drawString(2*cm, y, texto)
                     y -= 0.6*cm
                     if y < 2*cm:
                         cpdf.showPage()
-                        y = 28*cm
+                        # Desenhar novamente cabeçalho
+                        try:
+                            cpdf.drawImage("CABEÇARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
+                        except:
+                            pass
+                        cpdf.setFont("Helvetica-Bold", 16)
+                        cpdf.drawString(2*cm, 24*cm, "Relatório de Estoque (Continuação)")
+                        y = 22*cm
                 cpdf.save()
                 with open(nome_pdf, "rb") as f:
                     st.download_button("Baixar PDF", f, file_name=nome_pdf)
@@ -253,66 +284,33 @@ else:
             cgm = aluno_data.get("cgm", "")
         st.text(f"CGM: {cgm}")
         st.text(f"Turma: {turma}")
-
-        # Dicionário com tamanhos por peça
-        tamanhos_por_peca = {
-            "jaqueta": ["EXG", "G1", "G2", "G3", "G4"],
-            "calça_conjunto_abrigo": ["EXG", "G1", "G2", "G3", "G4"],
-            "camisa_farda_masculina": ["6", "7", "8", "9", "10", "11", "12"],
-            "camisa_farda_feminina": ["6", "7", "10", "11", "12", "34", "G1", "GG"],
-            "calça_farda_masculina": ["46", "48", "50", "52", "54", "56", "58", "60"],
-            "calça_farda_feminina": ["46", "48", "50", "52", "54", "56", "58"],
-            "boina": ["P", "M", "G", "GG"]
-        }
-
-        # Lista de peças com nome do arquivo e chave para tamanhos
         pecas = [
-            ("boina.png", "boina"),
-            ("conjunto_abrigo.png", "jaqueta"),
-            ("calça_farda.png", "calça_farda_masculina"),
-            ("camisa_farda_masc.png", "camisa_farda_masculina"),
-            ("camisa_farda_fem.png", "camisa_farda_feminina"),
-            ("calça_farda_fem.png", "calça_farda_feminina"),
-            ("calça_conjunto_abrigo.png", "calça_conjunto_abrigo")
+            "boina.png",
+            "calça_farda.png",
+            "camisa.png",
+            "camisa_farda.png",
+            "conjunto_abrigo.png",
+            "jaqueta_farda.png",
+            "moleton_abrigo.png"
         ]
-
         entrega = {}
-        cols = st.columns(3)
-        for idx, (imagem, nome_peca) in enumerate(pecas):
-            with cols[idx % 3]:
-                img_path = os.path.join("images", imagem)
+        cols = st.columns(4)
+        for idx, peca in enumerate(pecas):
+            with cols[idx % 4]:
+                img_path = os.path.join("images", peca)
                 if os.path.exists(img_path):
-                    st.image(img_path, width=120)
-                
-                qtd = st.number_input(
-                    f"Qtd {nome_peca}",
-                    min_value=0,
-                    step=1,
-                    key=f"qtd_{nome_peca}"
-                )
-
-                tamanhos_opcoes = tamanhos_por_peca.get(nome_peca, ["Único"])
-                tam = st.selectbox(
-                    f"Tamanho {nome_peca}",
-                    tamanhos_opcoes,
-                    key=f"tam_{nome_peca}"
-                )
-                
-                entrega[nome_peca] = {
-                    "quantidade": qtd,
-                    "tamanho": tam
-                }
-
+                    st.image(img_path, width=100)
+                qtd = st.number_input(f"{peca}", min_value=0, step=1, key=f"qtd_{peca}")
+                entrega[peca] = qtd
         if st.button("Salvar Entrega"):
-            for peca, dados in entrega.items():
-                if dados["quantidade"] > 0:
+            for peca, qtd in entrega.items():
+                if qtd > 0:
                     movimentacao_aluno_col.insert_one({
                         "aluno": aluno_nome,
                         "cgm": cgm,
                         "turma": turma,
                         "peca": peca,
-                        "quantidade": dados["quantidade"],
-                        "tamanho": dados["tamanho"],
+                        "quantidade": qtd,
                         "data": datetime.now().strftime("%Y-%m-%d")
                     })
             st.success("Registro salvo com sucesso!")
@@ -327,7 +325,7 @@ else:
             registros = list(movimentacao_aluno_col.find({"aluno": aluno_nome}))
             if registros:
                 df = pd.DataFrame(registros)
-                st.dataframe(df[["peca", "quantidade", "tamanho", "data"]])
+                st.dataframe(df[["peca", "quantidade", "data"]])
                 if st.button("Devolver todas as peças"):
                     movimentacao_aluno_col.delete_many({"aluno": aluno_nome})
                     st.success("Peças devolvidas ao estoque.")
@@ -360,7 +358,38 @@ else:
             except Exception as e:
                 st.error(f"Erro ao importar arquivo: {e}")
 
+    # --- ABA CADASTRO DE USUÁRIOS ---
+    elif menu == "Cadastro de Usuários":
+        st.subheader("Cadastro e Gerenciamento de Usuários")
+
+        usuarios = list(usuarios_col.find({}, {"_id":0, "usuario":1, "nivel":1}))
+        df_usuarios = pd.DataFrame(usuarios)
+        st.dataframe(df_usuarios)
+
+        with st.form("form_cadastro_usuario"):
+            novo_usuario = st.text_input("Novo usuário")
+            nova_senha = st.text_input("Senha", type="password")
+            nivel = st.selectbox("Nível", ["admin", "user"])
+            submit = st.form_submit_button("Cadastrar")
+
+            if submit:
+                if novo_usuario and nova_senha:
+                    if usuarios_col.find_one({"usuario": novo_usuario}):
+                        st.warning("Usuário já existe!")
+                    else:
+                        usuarios_col.insert_one({
+                            "usuario": novo_usuario,
+                            "senha": nova_senha,
+                            "nivel": nivel
+                        })
+                        st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
+                        st.experimental_rerun()
+                else:
+                    st.error("Usuário e senha são obrigatórios.")
+
     # --- SAIR ---
     elif menu == "🚪 Sair do Sistema":
         st.session_state.logado = False
-        st.rerun()
+        st.session_state.pop('usuario_logado', None)
+        st.session_state.pop('nivel_usuario', None)
+        st.experimental_rerun()
