@@ -432,7 +432,7 @@ else:
         st.markdown("---")
 
         arquivo = st.file_uploader("📂 Selecione o arquivo de alunos", type=["txt", "csv"])
-        delimitador = st.selectbox("Delimitador",
+        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
     if arquivo:
         delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
         try:
