@@ -242,7 +242,7 @@ else:
                 nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
                 cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
                 try:
-                    cpdf.drawImage("CABEÇARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
+                    cpdf.drawImage("CABECARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
                 except:
                     pass
                 cpdf.setFont("Helvetica-Bold", 16)
