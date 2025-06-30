@@ -87,9 +87,9 @@ def calcular_estoque():
     return pd.DataFrame(lista)
 
 # --- INÍCIO DO APP ---
-st.set_page_config(page_title="Sistema de Fardas", layout="wide")
+st.set_page_config(page_title="CCMLC - Sistema de Fardas by Malheiros", layout="wide")
 
-st.title("Sistema de Controle de Fardas")
+st.title("Sistema de Controle de Fardas V2.0 LSM")
 
 if "logado" not in st.session_state:
     st.session_state.logado = False
