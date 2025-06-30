@@ -315,67 +315,99 @@ else:
                 st.error(f"Erro ao importar arquivo: {e}")
 
     # --- ABA ALUNOS ---
-    elif menu == "Alunos":
-        st.subheader("Registro de Entrega de Fardas aos Alunos")
-        alunos = list(alunos_col.find())
-        nomes_alunos = [a["nome"] for a in alunos] if alunos else []
-        aluno_nome = st.selectbox("Aluno", nomes_alunos)
-        turma = ""
-        cgm = ""
-        if aluno_nome:
-            aluno_data = alunos_col.find_one({"nome": aluno_nome})
-            turma = aluno_data.get("turma", "")
-            cgm = aluno_data.get("cgm", "")
-        st.text(f"CGM: {cgm}")
-        st.text(f"Turma: {turma}")
-        pecas = [
-            "boina.png",
-            "calça_farda.png",
-            "camisa.png",
-            "camisa_farda.png",
-            "conjunto_abrigo.png",
-            "jaqueta_farda.png",
-            "moleton_abrigo.png"
-        ]
-        entrega = {}
-        cols = st.columns(4)
-        for idx, peca in enumerate(pecas):
-            with cols[idx % 4]:
-                img_path = os.path.join("images", peca)
-                if os.path.exists(img_path):
-                    st.image(img_path, width=100)
-                qtd = st.number_input(f"{peca}", min_value=0, step=1, key=f"qtd_{peca}")
-                entrega[peca] = qtd
-        if st.button("Salvar Entrega"):
-            for peca, qtd in entrega.items():
-                if qtd > 0:
-                    movimentacao_aluno_col.insert_one({
-                        "aluno": aluno_nome,
-                        "cgm": cgm,
-                        "turma": turma,
-                        "peca": peca,
-                        "quantidade": qtd,
-                        "data": datetime.now().strftime("%Y-%m-%d")
-                    })
-            st.success("Registro salvo com sucesso!")
+elif menu == "Alunos":
+    st.subheader("Registro de Entrega de Fardas aos Alunos")
 
-    # --- CONSULTAR ALUNO ---
-    elif menu == "Consultar Aluno":
-        st.subheader("Consulta de Entregas de Fardas por Aluno")
-        alunos = list(alunos_col.find())
-        nomes_alunos = [a["nome"] for a in alunos] if alunos else []
-        aluno_nome = st.selectbox("Selecione o aluno", nomes_alunos)
-        if aluno_nome:
-            registros = list(movimentacao_aluno_col.find({"aluno": aluno_nome}))
-            if registros:
-                df = pd.DataFrame(registros)
-                st.dataframe(df[["peca", "quantidade", "data"]])
-                if st.button("Devolver todas as peças"):
-                    movimentacao_aluno_col.delete_many({"aluno": aluno_nome})
-                    st.success("Peças devolvidas ao estoque.")
-            else:
-                st.info("Nenhum registro encontrado para este aluno.")
+    # Busca todos os alunos cadastrados
+    alunos = list(alunos_col.find())
+    nomes_alunos = [a["nome"] for a in alunos] if alunos else []
 
+    aluno_nome = st.selectbox("Aluno", nomes_alunos)
+
+    turma = ""
+    cgm = ""
+    sexo_aluno = ""
+    if aluno_nome:
+        # Busca dados do aluno selecionado
+        aluno_data = alunos_col.find_one({"nome": aluno_nome})
+        turma = aluno_data.get("turma", "")
+        cgm = aluno_data.get("cgm", "")
+        sexo_aluno = aluno_data.get("sexo", "")
+
+    st.text(f"CGM: {cgm}")
+    st.text(f"Turma: {turma}")
+    st.text(f"Sexo: {sexo_aluno}")
+
+    # Produtos e tamanhos separados por sexo
+    produtos_por_sexo = {
+        "Masculino": {
+            "CAMISA FARDA MASC.": ["6", "7", "8", "9", "10", "11", "12"],
+            "CALÇA FARDA MASC.": ["46", "48", "50", "52", "54", "56", "58", "60"],
+        },
+        "Feminino": {
+            "CAMISA FARDA FEM.": ["6", "7", "10", "11", "12", "34", "G1", "GG"],
+            "CALÇA FARDA FEM.": ["46", "48", "50", "52", "54", "56", "58"],
+        },
+        "Unissex": {
+            "JAQUETA": ["EXG", "G1", "G2", "G3", "G4"],
+            "CONJUNTO ABRIGO - Jaqueta": ["EXG", "G1", "G2", "G3", "G4"],
+            "CONJUNTO ABRIGO - Calça": ["EXG", "G1", "G2", "G3", "G4"],
+            "BOINA": ["Único"],
+        }
+    }
+
+    with st.form("entrega_farda_form"):
+        if sexo_aluno:
+            # Combina produtos do sexo do aluno + unissex
+            produtos_selecionaveis = {
+                **produtos_por_sexo.get(sexo_aluno, {}),
+                **produtos_por_sexo["Unissex"]
+            }
+        else:
+            # Caso sexo não informado, mostra tudo
+            produtos_selecionaveis = {}
+            for grupo in produtos_por_sexo.values():
+                produtos_selecionaveis.update(grupo)
+
+        produto = st.selectbox("Produto", list(produtos_selecionaveis.keys()))
+
+        tamanhos = produtos_selecionaveis[produto]
+        tamanho = st.selectbox("Tamanho", tamanhos)
+
+        quantidade = st.number_input("Quantidade", min_value=1, step=1)
+
+        enviar = st.form_submit_button("Salvar Entrega")
+
+        if enviar and aluno_nome:
+            movimentacao_aluno_col.insert_one({
+                "aluno": aluno_nome,
+                "cgm": cgm,
+                "turma": turma,
+                "sexo": sexo_aluno,
+                "peca": produto,
+                "tamanho": tamanho,
+                "quantidade": quantidade,
+                "data": datetime.now().strftime("%Y-%m-%d")
+            })
+            st.success(f"Entrega registrada: {produto} - Tam. {tamanho} - {quantidade} unidade(s)")
+
+# --- CONSULTAR ALUNO ---
+elif menu == "Consultar Aluno":
+    st.subheader("Consulta de Entregas de Fardas por Aluno")
+    alunos = list(alunos_col.find())
+    nomes_alunos = [a["nome"] for a in alunos] if alunos else []
+    aluno_nome = st.selectbox("Selecione o aluno", nomes_alunos)
+    if aluno_nome:
+        registros = list(movimentacao_aluno_col.find({"aluno": aluno_nome}))
+        if registros:
+            df = pd.DataFrame(registros)
+            if not df.empty:
+                st.dataframe(df[["peca", "tamanho", "quantidade", "data"]])
+            if st.button("Devolver todas as peças"):
+                movimentacao_aluno_col.delete_many({"aluno": aluno_nome})
+                st.success("Peças devolvidas ao estoque.")
+        else:
+            st.info("Nenhum registro encontrado para este aluno.")
     # --- CADASTRO DE USUÁRIOS ---
     elif menu == "Cadastro de Usuários":
         st.subheader("Cadastro e Gerenciamento de Usuários")
