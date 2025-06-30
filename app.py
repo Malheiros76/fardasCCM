@@ -432,9 +432,10 @@ else:
         st.markdown("---")
 
         arquivo = st.file_uploader("📂 Selecione o arquivo de alunos", type=["txt", "csv"])
-        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
-    if arquivo:
-        delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
+        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"], index=2)
+
+        if arquivo:
+            delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
         try:
             df_alunos = pd.read_csv(arquivo, delimiter=delimitador_real)
             st.success("✅ Arquivo carregado com sucesso!")
