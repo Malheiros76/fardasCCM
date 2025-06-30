@@ -289,53 +289,121 @@ else:
             except Exception as e:
                 st.error(f"Erro ao importar arquivo: {e}")
 
-    # --- ABA ALUNOS ---
-    elif menu == "Alunos":
-        st.subheader("Registro de Entrega de Fardas aos Alunos")
-        alunos = list(alunos_col.find())
-        nomes_alunos = [a["nome"] for a in alunos] if alunos else []
-        aluno_nome = st.selectbox("Aluno", nomes_alunos)
-        turma = ""
-        cgm = ""
-        sexo = ""
-        if aluno_nome:
-            aluno_data = alunos_col.find_one({"nome": aluno_nome})
-            turma = aluno_data.get("turma", "")
-            cgm = aluno_data.get("cgm", "")
-            sexo = aluno_data.get("sexo", "")
-        st.text(f"CGM: {cgm}")
-        st.text(f"Turma: {turma}")
-        st.text(f"Sexo: {sexo}")
-        pecas = [
-            "boina.png",
-            "calça_farda.png",
-            "camisa.png",
-            "camisa_farda.png",
-            "conjunto_abrigo.png",
-            "jaqueta_farda.png",
-            "moleton_abrigo.png"
-        ]
-        entrega = {}
-        cols = st.columns(4)
-        for idx, peca in enumerate(pecas):
-            with cols[idx % 4]:
-                img_path = os.path.join("images", peca)
-                if os.path.exists(img_path):
-                    st.image(img_path, width=100)
-                qtd = st.number_input(f"{peca}", min_value=0, step=1, key=f"qtd_{peca}")
-                entrega[peca] = qtd
-        if st.button("Salvar Entrega"):
-            for peca, qtd in entrega.items():
-                if qtd > 0:
-                    movimentacao_aluno_col.insert_one({
-                        "aluno": aluno_nome,
-                        "cgm": cgm,
-                        "turma": turma,
-                        "peca": peca,
-                        "quantidade": qtd,
-                        "data": datetime.now().strftime("%Y-%m-%d")
-                    })
-            st.success("Registro salvo com sucesso!")
+   # --- ABA ALUNOS ---
+elif menu == "Alunos":
+    st.subheader("Registro de Entrega de Fardas aos Alunos")
+
+    alunos = list(alunos_col.find())
+    nomes_alunos = [a["nome"] for a in alunos] if alunos else []
+
+    aluno_nome = st.selectbox("Aluno", nomes_alunos)
+    turma = ""
+    cgm = ""
+    sexo = ""
+
+    if aluno_nome:
+        aluno_data = alunos_col.find_one({"nome": aluno_nome})
+        turma = aluno_data.get("turma", "")
+        cgm = aluno_data.get("cgm", "")
+        sexo = aluno_data.get("sexo", "").lower()
+
+    st.text(f"CGM: {cgm}")
+    st.text(f"Turma: {turma}")
+    st.text(f"Sexo: {sexo.upper() if sexo else ''}")
+
+    # Lista de produtos (imagens)
+    pecas = [
+        "boina.png",
+        "calça_farda.png",
+        "camisa.png",
+        "camisa_farda.png",
+        "conjunto_abrigo.png",
+        "jaqueta_farda.png",
+        "moleton_abrigo.png"
+    ]
+
+    # Dicionário dos tamanhos por produto e sexo
+    tamanhos = {
+        "jaqueta_farda.png": {
+            "masculino": ["EXG", "G1", "G2", "G3", "G4"],
+            "feminino": ["EXG", "G1", "G2", "G3", "G4"]
+        },
+        "conjunto_abrigo.png": {  # Como exemplo, pode expandir
+            "masculino": ["EXG", "G1", "G2", "G3", "G4"],
+            "feminino": ["EXG", "G1", "G2", "G3", "G4"]
+        },
+        "calça_farda.png": {
+            "masculino": ["46", "48", "50", "52", "54", "56", "58", "60"],
+            "feminino": ["46", "48", "50", "52", "54", "56", "58"]
+        },
+        "camisa.png": {
+            "masculino": ["6", "7", "8", "9", "10", "11", "12"],
+            "feminino": ["6", "7", "10", "11", "12", "34", "G1", "GG"]
+        },
+        "camisa_farda.png": {
+            "masculino": ["6", "7", "8", "9", "10", "11", "12"],
+            "feminino": ["6", "7", "10", "11", "12", "34", "G1", "GG"]
+        },
+        "moleton_abrigo.png": {
+            "masculino": ["P", "M", "G", "GG"],
+            "feminino": ["P", "M", "G", "GG"]
+        },
+        "boina.png": {  # boina não tem tamanho
+            "masculino": [],
+            "feminino": []
+        }
+    }
+
+    entrega = {}
+
+    cols = st.columns(4)
+    for idx, peca in enumerate(pecas):
+        with cols[idx % 4]:
+            img_path = os.path.join("images", peca)
+            if os.path.exists(img_path):
+                st.image(img_path, width=100)
+            else:
+                st.text(f"{peca} (imagem não encontrada)")
+
+            # Quantidade
+            qtd = st.number_input(f"Quantidade de {peca}", min_value=0, step=1, key=f"qtd_{peca}")
+
+            # Tamanhos possíveis
+            sex_key = "masculino" if sexo == "m" or sexo == "masculino" else "feminino"
+            lista_tamanhos = tamanhos.get(peca, {}).get(sex_key, [])
+
+            if lista_tamanhos:
+                tamanho_sel = st.selectbox(f"Tamanho de {peca}", options=[""] + lista_tamanhos, key=f"tam_{peca}")
+                if tamanho_sel == "":
+                    tamanho_manual = st.text_input(f"Informe o tamanho manual para {peca}", key=f"tam_manual_{peca}")
+                    tamanho_final = tamanho_manual.strip()
+                else:
+                    tamanho_final = tamanho_sel
+            else:
+                tamanho_final = ""  # produto sem tamanho
+
+            entrega[peca] = {"quantidade": qtd, "tamanho": tamanho_final}
+
+    if st.button("Salvar Entrega"):
+        registros_salvos = 0
+        for peca, dados in entrega.items():
+            qtd = dados["quantidade"]
+            tam = dados["tamanho"]
+            if qtd > 0:
+                movimentacao_aluno_col.insert_one({
+                    "aluno": aluno_nome,
+                    "cgm": cgm,
+                    "turma": turma,
+                    "peca": peca,
+                    "quantidade": qtd,
+                    "tamanho": tam,
+                    "data": datetime.now().strftime("%Y-%m-%d")
+                })
+                registros_salvos += 1
+        if registros_salvos > 0:
+            st.success(f"{registros_salvos} registro(s) salvo(s) com sucesso!")
+        else:
+            st.warning("Nenhuma peça foi informada com quantidade maior que zero.")
 
     # --- CONSULTAR ALUNO ---
     elif menu == "Consultar Aluno":
