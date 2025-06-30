@@ -9,6 +9,7 @@ from reportlab.lib.units import cm
 import smtplib
 from email.mime.text import MIMEText
 import os
+import bcrypt
 
 # --- CONFIGURAÇÃO DE MONGO ---
 client = MongoClient("mongodb+srv://bibliotecaluizcarlos:terra166@cluster0.uyvqnek.mongodb.net/?retryWrites=true&w=majority")
@@ -23,12 +24,22 @@ movimentacao_aluno_col = db["movimentacao_aluno"]
 
 # --- FUNÇÕES AUXILIARES ---
 
+def hash_senha(senha):
+    return bcrypt.hashpw(senha.encode(), bcrypt.gensalt())
+
+def verificar_senha(senha_plain, senha_hash):
+    if isinstance(senha_hash, str):
+        senha_hash = senha_hash.encode('utf-8')
+    return bcrypt.checkpw(senha_plain.encode(), senha_hash)
+
 def autenticar(usuario, senha):
-    user = usuarios_col.find_one({"usuario": usuario, "senha": senha})
+    user = usuarios_col.find_one({"usuario": usuario})
     if user:
-        st.session_state['usuario_logado'] = usuario
-        st.session_state['nivel_usuario'] = user.get("nivel", "user")
-        return True
+        senha_hash = user["senha"]
+        if verificar_senha(senha, senha_hash):
+            st.session_state['usuario_logado'] = usuario
+            st.session_state['nivel_usuario'] = user.get("nivel", "user")
+            return True
     return False
 
 def alerta_estoque():
@@ -58,7 +69,7 @@ def enviar_email(destinatario, mensagem):
         msg['To'] = destinatario
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login('bibliotecaluizcarlos@gmail.com', 'terra166') # ajuste para senha de app se necessário
+            server.login('bibliotecaluizcarlos@gmail.com', 'terra166') # senha app se precisar
             server.send_message(msg)
     except Exception as e:
         st.error(f"Erro ao enviar email: {e}")
@@ -105,9 +116,9 @@ if not st.session_state.logado:
         usuario = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
         if st.form_submit_button("Entrar"):
-            if autenticar(usuario, senha):
+            if autenticar(usuario.strip(), senha.strip()):
                 st.session_state.logado = True
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
 else:
@@ -179,12 +190,20 @@ else:
             data = st.date_input("Data", datetime.now())
             tipo = st.selectbox("Tipo", ["Entrada", "Saída"])
             funcionarios = [f["nome"] for f in cadastro_col.find({}, {"nome": 1})]
-            funcionario = st.selectbox("Funcionário", funcionarios if funcionarios else ["Nenhum funcionário cadastrado"])
+            if not funcionarios:
+                st.warning("Nenhum funcionário cadastrado! Cadastre antes.")
+                funcionario = None
+            else:
+                funcionario = st.selectbox("Funcionário", funcionarios)
             produtos_cadastrados = [p["produto"] for p in produtos_col.find({}, {"produto": 1})]
-            produto = st.selectbox("Produto", produtos_cadastrados if produtos_cadastrados else ["Nenhum produto cadastrado"])
+            if not produtos_cadastrados:
+                st.warning("Nenhum produto cadastrado! Cadastre antes.")
+                produto = None
+            else:
+                produto = st.selectbox("Produto", produtos_cadastrados)
             quantidade = st.number_input("Quantidade", min_value=1, step=1)
             if st.form_submit_button("Registrar"):
-                if funcionario and produto and quantidade:
+                if funcionario and produto and quantidade > 0:
                     movimentacao_col.insert_one({
                         "data": data.strftime("%Y-%m-%d"),
                         "tipo": tipo,
@@ -194,6 +213,8 @@ else:
                     })
                     produtos_col.update_one({"produto": produto}, {"$set": {"produto": produto}}, upsert=True)
                     st.success("Movimentação registrada!")
+                else:
+                    st.error("Preencha todos os campos corretamente.")
 
     # --- ABA ESTOQUE ---
     elif menu == "Estoque":
@@ -234,7 +255,6 @@ else:
                     y -= 0.6*cm
                     if y < 2*cm:
                         cpdf.showPage()
-                        # Desenhar novamente cabeçalho
                         try:
                             cpdf.drawImage("CABEÇARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
                         except:
@@ -373,13 +393,16 @@ else:
             submit = st.form_submit_button("Cadastrar")
 
             if submit:
+                novo_usuario = novo_usuario.strip()
+                nova_senha = nova_senha.strip()
                 if novo_usuario and nova_senha:
                     if usuarios_col.find_one({"usuario": novo_usuario}):
                         st.warning("Usuário já existe!")
                     else:
+                        senha_hash = hash_senha(nova_senha).decode('utf-8')
                         usuarios_col.insert_one({
                             "usuario": novo_usuario,
-                            "senha": nova_senha,
+                            "senha": senha_hash,
                             "nivel": nivel
                         })
                         st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
@@ -392,4 +415,4 @@ else:
         st.session_state.logado = False
         st.session_state.pop('usuario_logado', None)
         st.session_state.pop('nivel_usuario', None)
-        st.rerun()
+        st.experimental_rerun()
