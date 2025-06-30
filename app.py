@@ -24,8 +24,7 @@ movimentacao_aluno_col = db["movimentacao_aluno"]
 # --- FUNÇÕES AUXILIARES ---
 
 def autenticar(usuario, senha):
-    user = usuarios_col.find_one({"usuario": usuario, "senha": senha})
-    return user
+    return usuarios_col.find_one({"usuario": usuario, "senha": senha}) is not None
 
 def alerta_estoque():
     pipeline = [
@@ -54,7 +53,7 @@ def enviar_email(destinatario, mensagem):
         msg['To'] = destinatario
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login('bibliotecaluizcarlos@gmail.com', 'terra166')
+            server.login('bibliotecaluizcarlos@gmail.com', 'terra166') # ajuste para senha de app se necessário
             server.send_message(msg)
     except Exception as e:
         st.error(f"Erro ao enviar email: {e}")
@@ -101,11 +100,8 @@ if not st.session_state.logado:
         usuario = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
         if st.form_submit_button("Entrar"):
-            user = autenticar(usuario, senha)
-            if user:
+            if autenticar(usuario, senha):
                 st.session_state.logado = True
-                st.session_state.usuario = user["usuario"]
-                st.session_state.nivel = user["nivel"]
                 st.rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
@@ -120,49 +116,23 @@ else:
             if cadastro.get("telefone"):
                 enviar_whatsapp(cadastro["telefone"], msg)
 
-    # --- MENU DINÂMICO ---
-    menu_opcoes = [
-        "Cadastro Geral",
-        "Movimentação",
-        "Estoque",
-        "Relatórios",
-        "Importar Estoque",
-        "Alunos",
-        "Consultar Aluno",
-        "Importar Alunos",
-        "🚪 Sair do Sistema"
-    ]
+    menu = st.sidebar.selectbox(
+        "Menu",
+        [
+            "Cadastro Geral",
+            "Movimentação",
+            "Estoque",
+            "Relatórios",
+            "Importar Estoque",
+            "Alunos",
+            "Consultar Aluno",
+            "Importar Alunos",
+            "🚪 Sair do Sistema"
+        ]
+    )
 
-    if st.session_state.nivel == "admin":
-        menu_opcoes.insert(0, "Cadastro de Usuários")
-
-    menu = st.sidebar.selectbox("Menu", menu_opcoes)
-
-    # --- CADASTRO DE USUÁRIOS ---
-    if menu == "Cadastro de Usuários":
-        st.subheader("Cadastro de Usuários do Sistema")
-
-        with st.form("novo_usuario"):
-            novo_usuario = st.text_input("Novo usuário")
-            nova_senha = st.text_input("Senha", type="password")
-            nivel = st.selectbox("Nível", ["admin", "user"])
-
-            if st.form_submit_button("Salvar"):
-                if novo_usuario and nova_senha:
-                    if usuarios_col.find_one({"usuario": novo_usuario}):
-                        st.error("Usuário já existe!")
-                    else:
-                        usuarios_col.insert_one({
-                            "usuario": novo_usuario,
-                            "senha": nova_senha,
-                            "nivel": nivel
-                        })
-                        st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
-                else:
-                    st.error("Preencha todos os campos!")
-
-    # --- CADASTRO GERAL ---
-    elif menu == "Cadastro Geral":
+    # --- ABA CADASTRO GERAL ---
+    if menu == "Cadastro Geral":
         st.subheader("Cadastro de Funcionários")
         with st.form("cadastro_func"):
             nome = st.text_input("Nome")
@@ -183,7 +153,7 @@ else:
                 else:
                     st.error("Todos os campos são obrigatórios.")
 
-    # --- MOVIMENTAÇÃO ---
+    # --- ABA MOVIMENTAÇÃO ---
     elif menu == "Movimentação":
         st.subheader("Entrada e Saída de Produtos")
         with st.form("movimento"):
@@ -206,7 +176,7 @@ else:
                     produtos_col.update_one({"produto": produto}, {"$set": {"produto": produto}}, upsert=True)
                     st.success("Movimentação registrada!")
 
-    # --- ESTOQUE ---
+    # --- ABA ESTOQUE ---
     elif menu == "Estoque":
         st.subheader("Estoque Atual")
         df = calcular_estoque()
@@ -220,7 +190,7 @@ else:
         else:
             st.info("Nenhum dado de movimentação encontrado.")
 
-    # --- RELATÓRIOS ---
+    # --- ABA RELATÓRIOS ---
     elif menu == "Relatórios":
         st.subheader("Relatórios de Estoque")
         df = calcular_estoque()
@@ -229,54 +199,23 @@ else:
         else:
             st.dataframe(df)
             if st.button("Gerar PDF"):
-    nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-    cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
+                nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+                cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
+                cpdf.setFont("Helvetica-Bold", 16)
+                cpdf.drawString(2*cm, 28*cm, "Relatório de Estoque")
+                y = 26*cm
+                for i, row in df.iterrows():
+                    texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']}"
+                    cpdf.drawString(2*cm, y, texto)
+                    y -= 0.6*cm
+                    if y < 2*cm:
+                        cpdf.showPage()
+                        y = 28*cm
+                cpdf.save()
+                with open(nome_pdf, "rb") as f:
+                    st.download_button("Baixar PDF", f, file_name=nome_pdf)
 
-    # LOGO (opcional)
-    logo_path = "images/CABEÇARIOAPP.png"   # ajuste o caminho se precisar
-    if os.path.exists(logo_path):
-        cpdf.drawImage(logo_path, 2*cm, 26*cm, width=4*cm, height=4*cm, preserveAspectRatio=True)
-
-    # TÍTULO E CABEÇALHO
-    cpdf.setFont("Helvetica-Bold", 14)
-    cpdf.drawString(7*cm, 28*cm, "Escola CCM Luiz Carlos de Paula e Souza")
-
-    cpdf.setFont("Helvetica", 12)
-    cpdf.drawString(7*cm, 27.2*cm, f"Relatório de Estoque de Fardas")
-
-    data_emissao = datetime.now().strftime("%d/%m/%Y %H:%M")
-    cpdf.drawString(7*cm, 26.5*cm, f"Emitido em: {data_emissao}")
-
-    # LINHA DIVISÓRIA
-    cpdf.line(2*cm, 26*cm, 19*cm, 26*cm)
-
-    # TABELA DE DADOS
-    y = 25*cm
-    cpdf.setFont("Helvetica-Bold", 10)
-    cpdf.drawString(2*cm, y, "Produto")
-    cpdf.drawString(8*cm, y, "Entrada")
-    cpdf.drawString(11*cm, y, "Saída")
-    cpdf.drawString(14*cm, y, "Saldo")
-
-    cpdf.setFont("Helvetica", 10)
-    y -= 0.5*cm
-
-    for _, row in df.iterrows():
-        cpdf.drawString(2*cm, y, str(row['produto']))
-        cpdf.drawString(8*cm, y, str(row['entrada']))
-        cpdf.drawString(11*cm, y, str(row['saida']))
-        cpdf.drawString(14*cm, y, str(row['saldo']))
-        y -= 0.5*cm
-        if y < 2*cm:
-            cpdf.showPage()
-            y = 28*cm
-
-    cpdf.save()
-
-    with open(nome_pdf, "rb") as f:
-        st.download_button("Baixar PDF", f, file_name=nome_pdf)
-
-    # --- IMPORTAR ESTOQUE ---
+    # --- ABA IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
         st.subheader("Importar Estoque via TXT ou CSV")
         arquivo = st.file_uploader("Arquivo", type=["txt", "csv"])
@@ -300,7 +239,7 @@ else:
             except Exception as e:
                 st.error(f"Erro ao importar arquivo: {e}")
 
-    # --- ALUNOS ---
+    # --- ABA ALUNOS ---
     elif menu == "Alunos":
         st.subheader("Registro de Entrega de Fardas aos Alunos")
         alunos = list(alunos_col.find())
@@ -314,33 +253,66 @@ else:
             cgm = aluno_data.get("cgm", "")
         st.text(f"CGM: {cgm}")
         st.text(f"Turma: {turma}")
+
+        # Dicionário com tamanhos por peça
+        tamanhos_por_peca = {
+            "jaqueta": ["EXG", "G1", "G2", "G3", "G4"],
+            "calça_conjunto_abrigo": ["EXG", "G1", "G2", "G3", "G4"],
+            "camisa_farda_masculina": ["6", "7", "8", "9", "10", "11", "12"],
+            "camisa_farda_feminina": ["6", "7", "10", "11", "12", "34", "G1", "GG"],
+            "calça_farda_masculina": ["46", "48", "50", "52", "54", "56", "58", "60"],
+            "calça_farda_feminina": ["46", "48", "50", "52", "54", "56", "58"],
+            "boina": ["P", "M", "G", "GG"]
+        }
+
+        # Lista de peças com nome do arquivo e chave para tamanhos
         pecas = [
-            "boina.png",
-            "calça_farda.png",
-            "camisa.png",
-            "camisa_farda.png",
-            "conjunto_abrigo.png",
-            "jaqueta_farda.png",
-            "moleton_abrigo.png"
+            ("boina.png", "boina"),
+            ("conjunto_abrigo.png", "jaqueta"),
+            ("calça_farda.png", "calça_farda_masculina"),
+            ("camisa_farda_masc.png", "camisa_farda_masculina"),
+            ("camisa_farda_fem.png", "camisa_farda_feminina"),
+            ("calça_farda_fem.png", "calça_farda_feminina"),
+            ("calça_conjunto_abrigo.png", "calça_conjunto_abrigo")
         ]
+
         entrega = {}
-        cols = st.columns(4)
-        for idx, peca in enumerate(pecas):
-            with cols[idx % 4]:
-                img_path = os.path.join("images", peca)
+        cols = st.columns(3)
+        for idx, (imagem, nome_peca) in enumerate(pecas):
+            with cols[idx % 3]:
+                img_path = os.path.join("images", imagem)
                 if os.path.exists(img_path):
-                    st.image(img_path, width=100)
-                qtd = st.number_input(f"{peca}", min_value=0, step=1, key=f"qtd_{peca}")
-                entrega[peca] = qtd
+                    st.image(img_path, width=120)
+                
+                qtd = st.number_input(
+                    f"Qtd {nome_peca}",
+                    min_value=0,
+                    step=1,
+                    key=f"qtd_{nome_peca}"
+                )
+
+                tamanhos_opcoes = tamanhos_por_peca.get(nome_peca, ["Único"])
+                tam = st.selectbox(
+                    f"Tamanho {nome_peca}",
+                    tamanhos_opcoes,
+                    key=f"tam_{nome_peca}"
+                )
+                
+                entrega[nome_peca] = {
+                    "quantidade": qtd,
+                    "tamanho": tam
+                }
+
         if st.button("Salvar Entrega"):
-            for peca, qtd in entrega.items():
-                if qtd > 0:
+            for peca, dados in entrega.items():
+                if dados["quantidade"] > 0:
                     movimentacao_aluno_col.insert_one({
                         "aluno": aluno_nome,
                         "cgm": cgm,
                         "turma": turma,
                         "peca": peca,
-                        "quantidade": qtd,
+                        "quantidade": dados["quantidade"],
+                        "tamanho": dados["tamanho"],
                         "data": datetime.now().strftime("%Y-%m-%d")
                     })
             st.success("Registro salvo com sucesso!")
@@ -355,7 +327,7 @@ else:
             registros = list(movimentacao_aluno_col.find({"aluno": aluno_nome}))
             if registros:
                 df = pd.DataFrame(registros)
-                st.dataframe(df[["peca", "quantidade", "data"]])
+                st.dataframe(df[["peca", "quantidade", "tamanho", "data"]])
                 if st.button("Devolver todas as peças"):
                     movimentacao_aluno_col.delete_many({"aluno": aluno_nome})
                     st.success("Peças devolvidas ao estoque.")
