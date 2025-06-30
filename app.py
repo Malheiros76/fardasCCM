@@ -24,7 +24,8 @@ movimentacao_aluno_col = db["movimentacao_aluno"]
 # --- FUNÇÕES AUXILIARES ---
 
 def autenticar(usuario, senha):
-    return usuarios_col.find_one({"usuario": usuario, "senha": senha}) is not None
+    user = usuarios_col.find_one({"usuario": usuario, "senha": senha})
+    return user
 
 def alerta_estoque():
     pipeline = [
@@ -53,7 +54,7 @@ def enviar_email(destinatario, mensagem):
         msg['To'] = destinatario
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login('bibliotecaluizcarlos@gmail.com', 'terra166') # ajuste para senha de app se necessário
+            server.login('bibliotecaluizcarlos@gmail.com', 'terra166')
             server.send_message(msg)
     except Exception as e:
         st.error(f"Erro ao enviar email: {e}")
@@ -87,9 +88,9 @@ def calcular_estoque():
     return pd.DataFrame(lista)
 
 # --- INÍCIO DO APP ---
-st.set_page_config(page_title="CCMLC - Sistema de Fardas by Malheiros", layout="wide")
+st.set_page_config(page_title="Sistema de Fardas", layout="wide")
 
-st.title("Sistema de Controle de Fardas V2.0 LSM")
+st.title("Sistema de Controle de Fardas")
 
 if "logado" not in st.session_state:
     st.session_state.logado = False
@@ -100,8 +101,11 @@ if not st.session_state.logado:
         usuario = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
         if st.form_submit_button("Entrar"):
-            if autenticar(usuario, senha):
+            user = autenticar(usuario, senha)
+            if user:
                 st.session_state.logado = True
+                st.session_state.usuario = user["usuario"]
+                st.session_state.nivel = user["nivel"]
                 st.rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
@@ -116,23 +120,49 @@ else:
             if cadastro.get("telefone"):
                 enviar_whatsapp(cadastro["telefone"], msg)
 
-    menu = st.sidebar.selectbox(
-        "Menu",
-        [
-            "Cadastro Geral",
-            "Movimentação",
-            "Estoque",
-            "Relatórios",
-            "Importar Estoque",
-            "Alunos",
-            "Consultar Aluno",
-            "Importar Alunos",
-            "🚪 Sair do Sistema"
-        ]
-    )
+    # --- MENU DINÂMICO ---
+    menu_opcoes = [
+        "Cadastro Geral",
+        "Movimentação",
+        "Estoque",
+        "Relatórios",
+        "Importar Estoque",
+        "Alunos",
+        "Consultar Aluno",
+        "Importar Alunos",
+        "🚪 Sair do Sistema"
+    ]
 
-    # --- ABA CADASTRO GERAL ---
-    if menu == "Cadastro Geral":
+    if st.session_state.nivel == "admin":
+        menu_opcoes.insert(0, "Cadastro de Usuários")
+
+    menu = st.sidebar.selectbox("Menu", menu_opcoes)
+
+    # --- CADASTRO DE USUÁRIOS ---
+    if menu == "Cadastro de Usuários":
+        st.subheader("Cadastro de Usuários do Sistema")
+
+        with st.form("novo_usuario"):
+            novo_usuario = st.text_input("Novo usuário")
+            nova_senha = st.text_input("Senha", type="password")
+            nivel = st.selectbox("Nível", ["admin", "user"])
+
+            if st.form_submit_button("Salvar"):
+                if novo_usuario and nova_senha:
+                    if usuarios_col.find_one({"usuario": novo_usuario}):
+                        st.error("Usuário já existe!")
+                    else:
+                        usuarios_col.insert_one({
+                            "usuario": novo_usuario,
+                            "senha": nova_senha,
+                            "nivel": nivel
+                        })
+                        st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
+                else:
+                    st.error("Preencha todos os campos!")
+
+    # --- CADASTRO GERAL ---
+    elif menu == "Cadastro Geral":
         st.subheader("Cadastro de Funcionários")
         with st.form("cadastro_func"):
             nome = st.text_input("Nome")
@@ -153,7 +183,7 @@ else:
                 else:
                     st.error("Todos os campos são obrigatórios.")
 
-    # --- ABA MOVIMENTAÇÃO ---
+    # --- MOVIMENTAÇÃO ---
     elif menu == "Movimentação":
         st.subheader("Entrada e Saída de Produtos")
         with st.form("movimento"):
@@ -176,7 +206,7 @@ else:
                     produtos_col.update_one({"produto": produto}, {"$set": {"produto": produto}}, upsert=True)
                     st.success("Movimentação registrada!")
 
-    # --- ABA ESTOQUE ---
+    # --- ESTOQUE ---
     elif menu == "Estoque":
         st.subheader("Estoque Atual")
         df = calcular_estoque()
@@ -190,7 +220,7 @@ else:
         else:
             st.info("Nenhum dado de movimentação encontrado.")
 
-    # --- ABA RELATÓRIOS ---
+    # --- RELATÓRIOS ---
     elif menu == "Relatórios":
         st.subheader("Relatórios de Estoque")
         df = calcular_estoque()
@@ -215,7 +245,7 @@ else:
                 with open(nome_pdf, "rb") as f:
                     st.download_button("Baixar PDF", f, file_name=nome_pdf)
 
-    # --- ABA IMPORTAR ESTOQUE ---
+    # --- IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
         st.subheader("Importar Estoque via TXT ou CSV")
         arquivo = st.file_uploader("Arquivo", type=["txt", "csv"])
@@ -239,7 +269,7 @@ else:
             except Exception as e:
                 st.error(f"Erro ao importar arquivo: {e}")
 
-    # --- ABA ALUNOS ---
+    # --- ALUNOS ---
     elif menu == "Alunos":
         st.subheader("Registro de Entrega de Fardas aos Alunos")
         alunos = list(alunos_col.find())
