@@ -112,7 +112,7 @@ if "logado" not in st.session_state:
 
 if not st.session_state.logado:
     st.subheader("Login do Sistema")
-    with st.form("login"):
+    with st.form("login_form"):
         usuario = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
         if st.form_submit_button("Entrar"):
