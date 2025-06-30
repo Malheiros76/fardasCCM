@@ -454,7 +454,8 @@ else:
                     alunos_col.update_one(
                         {"cgm": str(row["CGM"])},
                         {
-                            "$set": {
+                            "$s"
+                            "et": {
                                 "nome": str(row["Nome do Estudante"]).strip(),
                                 "turma": str(row["Turma"]).strip(),
                                 "sexo": sexo_texto,
@@ -471,33 +472,39 @@ else:
     elif menu == "Cadastro de Usuários":
         st.subheader("Cadastro e Gerenciamento de Usuários")
 
-    usuarios = list(usuarios_col.find({}, {"_id": 0, "usuario": 1, "nivel": 1}))
+        usuarios = list(usuarios_col.find({}, {"_id": 0, "usuario": 1, "nivel": 1}))
 
-    if usuarios:
-        usuarios_formatados = [
-            {
-                "usuario": u.get("usuario", ""),
-                "nivel": u.get("nivel", "user")
-            }
-            for u in usuarios
-        ]
-        df_usuarios = pd.DataFrame(usuarios_formatados)
-        st.dataframe(df_usuarios)
-    else:
-        st.info("Nenhum usuário cadastrado ainda.")
+        if usuarios:
+            usuarios_formatados = [
+                {
+                    "usuario": u.get("usuario", ""),
+                    "nivel": u.get("nivel", "user")
+                }
+                for u in usuarios
+            ]
+            df_usuarios = pd.DataFrame(usuarios_formatados)
+            st.dataframe(df_usuarios)
+        else:
+            st.info("Nenhum usuário cadastrado ainda.")
 
-    st.markdown("---")
-    st.markdown("### Novo Usuário")
+        st.markdown("---")
+        st.markdown("### Novo Usuário")
 
-    with st.form("form_cadastro_usuario"):
-        novo_usuario = st.text_input("Novo usuário")
-        nova_senha = st.text_input("Senha", type="password")
-        nivel = st.selectbox("Nível", ["admin", "user"])
-        submit = st.form_submit_button("Cadastrar")
+        with st.form("form_cadastro_usuario"):
+            novo_usuario = st.text_input("Novo usuário")
+            nova_senha = st.text_input("Senha", type="password")
+            confirm_senha = st.text_input("Confirme a senha", type="password")
+            nivel = st.selectbox("Nível", ["admin", "user"])
+            submit = st.form_submit_button("Cadastrar")
 
-        if submit:
-            if novo_usuario and nova_senha:
-                if usuarios_col.find_one({"usuario": novo_usuario}):
+            if submit:
+                if not novo_usuario or not nova_senha or not confirm_senha:
+                    st.error("Preencha todos os campos.")
+                elif nova_senha != confirm_senha:
+                    st.error("As senhas não coincidem.")
+                elif len(nova_senha) < 6:
+                    st.error("Senha muito curta. Mínimo 6 caracteres.")
+                elif usuarios_col.find_one({"usuario": novo_usuario}):
                     st.warning("Usuário já existe!")
                 else:
                     usuarios_col.insert_one({
@@ -507,10 +514,8 @@ else:
                     })
                     st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
                     st.experimental_rerun()
-            else:
-                st.error("Preencha todos os campos.")
 
-        elif menu == "🚪 Sair do Sistema":
-            st.session_state.logado = False
-            st.success("Sessão encerrada.")
-            st.rerun()
+    elif menu == "🚪 Sair do Sistema":
+        st.session_state.logado = False
+        st.success("Sessão encerrada.")
+        st.rerun()
