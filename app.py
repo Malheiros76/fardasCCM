@@ -23,7 +23,6 @@ alunos_col = db["alunos"]
 movimentacao_aluno_col = db["movimentacao_aluno"]
 
 # --- FUNÇÕES AUXILIARES ---
-
 def hash_senha(senha):
     return bcrypt.hashpw(senha.encode(), bcrypt.gensalt())
 
@@ -69,7 +68,7 @@ def enviar_email(destinatario, mensagem):
         msg['To'] = destinatario
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login('bibliotecaluizcarlos@gmail.com', 'terra166') # senha de app se precisar
+            server.login('bibliotecaluizcarlos@gmail.com', 'terra166')  # senha de app se precisar
             server.send_message(msg)
     except Exception as e:
         st.error(f"Erro ao enviar email: {e}")
@@ -104,7 +103,6 @@ def calcular_estoque():
 
 # --- INÍCIO DO APP ---
 st.set_page_config(page_title="Sistema de Fardas", layout="wide")
-
 st.title("Sistema de Controle de Fardas")
 
 if "logado" not in st.session_state:
@@ -132,7 +130,6 @@ else:
             if cadastro.get("telefone"):
                 enviar_whatsapp(cadastro["telefone"], msg)
 
-    # Menu
     if st.session_state.get("nivel_usuario") == "admin":
         opcoes_menu = [
             "Cadastro Geral",
@@ -184,7 +181,7 @@ else:
                     st.error("Todos os campos são obrigatórios.")
 
     # --- ABA MOVIMENTAÇÃO ---
-    elif menu == "Movimentação":
+    if menu == "Movimentação":
         st.subheader("Entrada e Saída de Produtos")
         with st.form("movimento"):
             data = st.date_input("Data", datetime.now())
@@ -217,7 +214,7 @@ else:
                     st.error("Preencha todos os campos corretamente.")
 
     # --- ABA ESTOQUE ---
-    elif menu == "Estoque":
+    if menu == "Estoque":
         st.subheader("Estoque Atual")
         df = calcular_estoque()
         if not df.empty:
@@ -231,7 +228,7 @@ else:
             st.info("Nenhum dado de movimentação encontrado.")
 
     # --- ABA RELATÓRIOS ---
-    elif menu == "Relatórios":
+    if menu == "Relatórios":
         st.subheader("Relatórios de Estoque")
         df = calcular_estoque()
         if df.empty:
@@ -266,7 +263,7 @@ else:
                     st.download_button("Baixar PDF", f, file_name=nome_pdf)
 
     # --- ABA IMPORTAR ESTOQUE ---
-    elif menu == "Importar Estoque":
+    if menu == "Importar Estoque":
         st.subheader("Importar Estoque via TXT ou CSV")
         arquivo = st.file_uploader("Arquivo", type=["txt", "csv"])
         delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
@@ -289,124 +286,124 @@ else:
             except Exception as e:
                 st.error(f"Erro ao importar arquivo: {e}")
 
-   # --- ABA ALUNOS ---
-elif menu == "Alunos":
-    st.subheader("Registro de Entrega de Fardas aos Alunos")
+    # --- ABA ALUNOS ---
+    if menu == "Alunos":
+        st.subheader("Registro de Entrega de Fardas aos Alunos")
 
-    alunos = list(alunos_col.find())
-    nomes_alunos = [a["nome"] for a in alunos] if alunos else []
+        alunos = list(alunos_col.find())
+        nomes_alunos = [a["nome"] for a in alunos] if alunos else []
 
-    aluno_nome = st.selectbox("Aluno", nomes_alunos)
-    turma = ""
-    cgm = ""
-    sexo = ""
+        aluno_nome = st.selectbox("Aluno", nomes_alunos)
+        turma = ""
+        cgm = ""
+        sexo = ""
 
-    if aluno_nome:
-        aluno_data = alunos_col.find_one({"nome": aluno_nome})
-        turma = aluno_data.get("turma", "")
-        cgm = aluno_data.get("cgm", "")
-        sexo = aluno_data.get("sexo", "").lower()
+        if aluno_nome:
+            aluno_data = alunos_col.find_one({"nome": aluno_nome})
+            turma = aluno_data.get("turma", "")
+            cgm = aluno_data.get("cgm", "")
+            sexo = aluno_data.get("sexo", "").lower()
 
-    st.text(f"CGM: {cgm}")
-    st.text(f"Turma: {turma}")
-    st.text(f"Sexo: {sexo.upper() if sexo else ''}")
+        st.text(f"CGM: {cgm}")
+        st.text(f"Turma: {turma}")
+        st.text(f"Sexo: {sexo.upper() if sexo else ''}")
 
-    # Lista de produtos (imagens)
-    pecas = [
-        "boina.png",
-        "calça_farda.png",
-        "camisa.png",
-        "camisa_farda.png",
-        "conjunto_abrigo.png",
-        "jaqueta_farda.png",
-        "moleton_abrigo.png"
-    ]
+        # Lista de produtos (imagens)
+        pecas = [
+            "boina.png",
+            "calça_farda.png",
+            "camisa.png",
+            "camisa_farda.png",
+            "conjunto_abrigo.png",
+            "jaqueta_farda.png",
+            "moleton_abrigo.png"
+        ]
 
-    # Dicionário dos tamanhos por produto e sexo
-    tamanhos = {
-        "jaqueta_farda.png": {
-            "masculino": ["EXG", "G1", "G2", "G3", "G4"],
-            "feminino": ["EXG", "G1", "G2", "G3", "G4"]
-        },
-        "conjunto_abrigo.png": {  # Como exemplo, pode expandir
-            "masculino": ["EXG", "G1", "G2", "G3", "G4"],
-            "feminino": ["EXG", "G1", "G2", "G3", "G4"]
-        },
-        "calça_farda.png": {
-            "masculino": ["46", "48", "50", "52", "54", "56", "58", "60"],
-            "feminino": ["46", "48", "50", "52", "54", "56", "58"]
-        },
-        "camisa.png": {
-            "masculino": ["6", "7", "8", "9", "10", "11", "12"],
-            "feminino": ["6", "7", "10", "11", "12", "34", "G1", "GG"]
-        },
-        "camisa_farda.png": {
-            "masculino": ["6", "7", "8", "9", "10", "11", "12"],
-            "feminino": ["6", "7", "10", "11", "12", "34", "G1", "GG"]
-        },
-        "moleton_abrigo.png": {
-            "masculino": ["P", "M", "G", "GG"],
-            "feminino": ["P", "M", "G", "GG"]
-        },
-        "boina.png": {  # boina não tem tamanho
-            "masculino": [],
-            "feminino": []
+        # Dicionário dos tamanhos por produto e sexo
+        tamanhos = {
+            "jaqueta_farda.png": {
+                "masculino": ["EXG", "G1", "G2", "G3", "G4"],
+                "feminino": ["EXG", "G1", "G2", "G3", "G4"]
+            },
+            "conjunto_abrigo.png": {
+                "masculino": ["EXG", "G1", "G2", "G3", "G4"],
+                "feminino": ["EXG", "G1", "G2", "G3", "G4"]
+            },
+            "calça_farda.png": {
+                "masculino": ["46", "48", "50", "52", "54", "56", "58", "60"],
+                "feminino": ["46", "48", "50", "52", "54", "56", "58"]
+            },
+            "camisa.png": {
+                "masculino": ["6", "7", "8", "9", "10", "11", "12"],
+                "feminino": ["6", "7", "10", "11", "12", "34", "G1", "GG"]
+            },
+            "camisa_farda.png": {
+                "masculino": ["6", "7", "8", "9", "10", "11", "12"],
+                "feminino": ["6", "7", "10", "11", "12", "34", "G1", "GG"]
+            },
+            "moleton_abrigo.png": {
+                "masculino": ["P", "M", "G", "GG"],
+                "feminino": ["P", "M", "G", "GG"]
+            },
+            "boina.png": {
+                "masculino": [],
+                "feminino": []
+            }
         }
-    }
 
-    entrega = {}
+        entrega = {}
 
-    cols = st.columns(4)
-    for idx, peca in enumerate(pecas):
-        with cols[idx % 4]:
-            img_path = os.path.join("images", peca)
-            if os.path.exists(img_path):
-                st.image(img_path, width=100)
-            else:
-                st.text(f"{peca} (imagem não encontrada)")
-
-            # Quantidade
-            qtd = st.number_input(f"Quantidade de {peca}", min_value=0, step=1, key=f"qtd_{peca}")
-
-            # Tamanhos possíveis
-            sex_key = "masculino" if sexo == "m" or sexo == "masculino" else "feminino"
-            lista_tamanhos = tamanhos.get(peca, {}).get(sex_key, [])
-
-            if lista_tamanhos:
-                tamanho_sel = st.selectbox(f"Tamanho de {peca}", options=[""] + lista_tamanhos, key=f"tam_{peca}")
-                if tamanho_sel == "":
-                    tamanho_manual = st.text_input(f"Informe o tamanho manual para {peca}", key=f"tam_manual_{peca}")
-                    tamanho_final = tamanho_manual.strip()
+        cols = st.columns(4)
+        for idx, peca in enumerate(pecas):
+            with cols[idx % 4]:
+                img_path = os.path.join("images", peca)
+                if os.path.exists(img_path):
+                    st.image(img_path, width=100)
                 else:
-                    tamanho_final = tamanho_sel
+                    st.text(f"{peca} (imagem não encontrada)")
+
+                # Quantidade
+                qtd = st.number_input(f"Quantidade de {peca}", min_value=0, step=1, key=f"qtd_{peca}")
+
+                # Tamanhos possíveis
+                sex_key = "masculino" if sexo == "m" or sexo == "masculino" else "feminino"
+                lista_tamanhos = tamanhos.get(peca, {}).get(sex_key, [])
+
+                if lista_tamanhos:
+                    tamanho_sel = st.selectbox(f"Tamanho de {peca}", options=[""] + lista_tamanhos, key=f"tam_{peca}")
+                    if tamanho_sel == "":
+                        tamanho_manual = st.text_input(f"Informe o tamanho manual para {peca}", key=f"tam_manual_{peca}")
+                        tamanho_final = tamanho_manual.strip()
+                    else:
+                        tamanho_final = tamanho_sel
+                else:
+                    tamanho_final = ""
+
+                entrega[peca] = {"quantidade": qtd, "tamanho": tamanho_final}
+
+        if st.button("Salvar Entrega"):
+            registros_salvos = 0
+            for peca, dados in entrega.items():
+                qtd = dados["quantidade"]
+                tam = dados["tamanho"]
+                if qtd > 0:
+                    movimentacao_aluno_col.insert_one({
+                        "aluno": aluno_nome,
+                        "cgm": cgm,
+                        "turma": turma,
+                        "peca": peca,
+                        "quantidade": qtd,
+                        "tamanho": tam,
+                        "data": datetime.now().strftime("%Y-%m-%d")
+                    })
+                    registros_salvos += 1
+            if registros_salvos > 0:
+                st.success(f"{registros_salvos} registro(s) salvo(s) com sucesso!")
             else:
-                tamanho_final = ""  # produto sem tamanho
+                st.warning("Nenhuma peça foi informada com quantidade maior que zero.")
 
-            entrega[peca] = {"quantidade": qtd, "tamanho": tamanho_final}
-
-    if st.button("Salvar Entrega"):
-        registros_salvos = 0
-        for peca, dados in entrega.items():
-            qtd = dados["quantidade"]
-            tam = dados["tamanho"]
-            if qtd > 0:
-                movimentacao_aluno_col.insert_one({
-                    "aluno": aluno_nome,
-                    "cgm": cgm,
-                    "turma": turma,
-                    "peca": peca,
-                    "quantidade": qtd,
-                    "tamanho": tam,
-                    "data": datetime.now().strftime("%Y-%m-%d")
-                })
-                registros_salvos += 1
-        if registros_salvos > 0:
-            st.success(f"{registros_salvos} registro(s) salvo(s) com sucesso!")
-        else:
-            st.warning("Nenhuma peça foi informada com quantidade maior que zero.")
-
-    # --- CONSULTAR ALUNO ---
-    elif menu == "Consultar Aluno":
+    # --- ABA CONSULTAR ALUNO ---
+    if menu == "Consultar Aluno":
         st.subheader("Consulta de Entregas de Fardas por Aluno")
         alunos = list(alunos_col.find())
         nomes_alunos = [a["nome"] for a in alunos] if alunos else []
@@ -423,7 +420,7 @@ elif menu == "Alunos":
                 st.info("Nenhum registro encontrado para este aluno.")
 
     # --- ABA IMPORTAR ALUNOS ---
-    elif menu == "Importar Alunos":
+    if menu == "Importar Alunos":
         st.subheader("📚 Importar Alunos via TXT ou CSV")
 
         if st.button("🧹 Limpar Tabela de Alunos"):
@@ -469,7 +466,7 @@ elif menu == "Alunos":
                 st.error(f"❌ Erro ao importar arquivo: {e}")
 
     # --- ABA CADASTRO DE USUÁRIOS ---
-    elif menu == "Cadastro de Usuários":
+    if menu == "Cadastro de Usuários":
         st.subheader("Cadastro e Gerenciamento de Usuários")
 
         usuarios = list(usuarios_col.find({}, {"_id": 0, "usuario": 1, "nivel": 1}))
@@ -511,7 +508,8 @@ elif menu == "Alunos":
                 else:
                     st.error("Preencha todos os campos.")
 
-    elif menu == "🚪 Sair do Sistema":
+    # --- SAIR DO SISTEMA ---
+    if menu == "🚪 Sair do Sistema":
         st.session_state.logado = False
         st.success("Sessão encerrada.")
         st.experimental_rerun()
