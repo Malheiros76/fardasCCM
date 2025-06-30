@@ -23,6 +23,7 @@ alunos_col = db["alunos"]
 movimentacao_aluno_col = db["movimentacao_aluno"]
 
 # --- FUNÇÕES AUXILIARES ---
+
 def hash_senha(senha):
     return bcrypt.hashpw(senha.encode(), bcrypt.gensalt())
 
@@ -68,7 +69,7 @@ def enviar_email(destinatario, mensagem):
         msg['To'] = destinatario
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login('bibliotecaluizcarlos@gmail.com', 'terra166')  # senha de app se precisar
+            server.login('bibliotecaluizcarlos@gmail.com', 'terra166') # senha de app se precisar
             server.send_message(msg)
     except Exception as e:
         st.error(f"Erro ao enviar email: {e}")
@@ -103,6 +104,7 @@ def calcular_estoque():
 
 # --- INÍCIO DO APP ---
 st.set_page_config(page_title="Sistema de Fardas", layout="wide")
+
 st.title("Sistema de Controle de Fardas")
 
 if "logado" not in st.session_state:
@@ -130,6 +132,7 @@ else:
             if cadastro.get("telefone"):
                 enviar_whatsapp(cadastro["telefone"], msg)
 
+    # Menu
     if st.session_state.get("nivel_usuario") == "admin":
         opcoes_menu = [
             "Cadastro Geral",
@@ -181,7 +184,7 @@ else:
                     st.error("Todos os campos são obrigatórios.")
 
     # --- ABA MOVIMENTAÇÃO ---
-    if menu == "Movimentação":
+    elif menu == "Movimentação":
         st.subheader("Entrada e Saída de Produtos")
         with st.form("movimento"):
             data = st.date_input("Data", datetime.now())
@@ -214,7 +217,7 @@ else:
                     st.error("Preencha todos os campos corretamente.")
 
     # --- ABA ESTOQUE ---
-    if menu == "Estoque":
+    elif menu == "Estoque":
         st.subheader("Estoque Atual")
         df = calcular_estoque()
         if not df.empty:
@@ -228,7 +231,7 @@ else:
             st.info("Nenhum dado de movimentação encontrado.")
 
     # --- ABA RELATÓRIOS ---
-    if menu == "Relatórios":
+    elif menu == "Relatórios":
         st.subheader("Relatórios de Estoque")
         df = calcular_estoque()
         if df.empty:
@@ -263,7 +266,7 @@ else:
                     st.download_button("Baixar PDF", f, file_name=nome_pdf)
 
     # --- ABA IMPORTAR ESTOQUE ---
-    if menu == "Importar Estoque":
+    elif menu == "Importar Estoque":
         st.subheader("Importar Estoque via TXT ou CSV")
         arquivo = st.file_uploader("Arquivo", type=["txt", "csv"])
         delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
@@ -287,7 +290,7 @@ else:
                 st.error(f"Erro ao importar arquivo: {e}")
 
     # --- ABA ALUNOS ---
-    if menu == "Alunos":
+    elif menu == "Alunos":
         st.subheader("Registro de Entrega de Fardas aos Alunos")
 
         alunos = list(alunos_col.find())
@@ -356,28 +359,29 @@ else:
         cols = st.columns(4)
         for idx, peca in enumerate(pecas):
             with cols[idx % 4]:
+                nome_peca = os.path.splitext(peca)[0]  # Remove extensão .png
                 img_path = os.path.join("images", peca)
                 if os.path.exists(img_path):
                     st.image(img_path, width=100)
                 else:
-                    st.text(f"{peca} (imagem não encontrada)")
+                    st.text(f"{nome_peca} (imagem não encontrada)")
 
                 # Quantidade
-                qtd = st.number_input(f"Quantidade de {peca}", min_value=0, step=1, key=f"qtd_{peca}")
+                qtd = st.number_input(f"Quantidade de {nome_peca}", min_value=0, step=1, key=f"qtd_{peca}")
 
                 # Tamanhos possíveis
                 sex_key = "masculino" if sexo == "m" or sexo == "masculino" else "feminino"
                 lista_tamanhos = tamanhos.get(peca, {}).get(sex_key, [])
 
                 if lista_tamanhos:
-                    tamanho_sel = st.selectbox(f"Tamanho de {peca}", options=[""] + lista_tamanhos, key=f"tam_{peca}")
+                    tamanho_sel = st.selectbox(f"Tamanho de {nome_peca}", options=[""] + lista_tamanhos, key=f"tam_{peca}")
                     if tamanho_sel == "":
-                        tamanho_manual = st.text_input(f"Informe o tamanho manual para {peca}", key=f"tam_manual_{peca}")
+                        tamanho_manual = st.text_input(f"Informe o tamanho manual para {nome_peca}", key=f"tam_manual_{peca}")
                         tamanho_final = tamanho_manual.strip()
                     else:
                         tamanho_final = tamanho_sel
                 else:
-                    tamanho_final = ""
+                    tamanho_final = ""  # produto sem tamanho
 
                 entrega[peca] = {"quantidade": qtd, "tamanho": tamanho_final}
 
@@ -402,8 +406,8 @@ else:
             else:
                 st.warning("Nenhuma peça foi informada com quantidade maior que zero.")
 
-    # --- ABA CONSULTAR ALUNO ---
-    if menu == "Consultar Aluno":
+    # --- CONSULTAR ALUNO ---
+    elif menu == "Consultar Aluno":
         st.subheader("Consulta de Entregas de Fardas por Aluno")
         alunos = list(alunos_col.find())
         nomes_alunos = [a["nome"] for a in alunos] if alunos else []
@@ -420,7 +424,7 @@ else:
                 st.info("Nenhum registro encontrado para este aluno.")
 
     # --- ABA IMPORTAR ALUNOS ---
-    if menu == "Importar Alunos":
+    elif menu == "Importar Alunos":
         st.subheader("📚 Importar Alunos via TXT ou CSV")
 
         if st.button("🧹 Limpar Tabela de Alunos"):
@@ -466,7 +470,7 @@ else:
                 st.error(f"❌ Erro ao importar arquivo: {e}")
 
     # --- ABA CADASTRO DE USUÁRIOS ---
-    if menu == "Cadastro de Usuários":
+    elif menu == "Cadastro de Usuários":
         st.subheader("Cadastro e Gerenciamento de Usuários")
 
         usuarios = list(usuarios_col.find({}, {"_id": 0, "usuario": 1, "nivel": 1}))
@@ -508,8 +512,7 @@ else:
                 else:
                     st.error("Preencha todos os campos.")
 
-    # --- SAIR DO SISTEMA ---
-    if menu == "🚪 Sair do Sistema":
+    elif menu == "🚪 Sair do Sistema":
         st.session_state.logado = False
         st.success("Sessão encerrada.")
         st.experimental_rerun()
