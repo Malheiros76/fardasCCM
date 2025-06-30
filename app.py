@@ -10,7 +10,6 @@ import smtplib
 from email.mime.text import MIMEText
 import os
 import bcrypt
-import os
 
 # --- CONFIGURAÇÃO DE MONGO ---
 client = MongoClient("mongodb+srv://bibliotecaluizcarlos:terra166@cluster0.uyvqnek.mongodb.net/?retryWrites=true&w=majority")
@@ -26,24 +25,41 @@ movimentacao_aluno_col = db["movimentacao_aluno"]
 # --- FUNÇÕES AUXILIARES ---
 
 def hash_senha(senha):
-    # Retorna o hash da senha em string para salvar no banco
-    return bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode('utf-8')
+    return bcrypt.hashpw(senha.encode(), bcrypt.gensalt())
 
 def verificar_senha(senha_plain, senha_hash):
-    # Garante que o hash está em bytes para bcrypt
-    if isinstance(senha_hash, str):
-        senha_hash = senha_hash.encode('utf-8')
-    return bcrypt.checkpw(senha_plain.encode(), senha_hash)
+    try:
+        if isinstance(senha_hash, str):
+            senha_hash = senha_hash.encode('utf-8')
+        return bcrypt.checkpw(senha_plain.encode(), senha_hash)
+    except:
+        return False
 
 def autenticar(usuario, senha):
     user = usuarios_col.find_one({"usuario": usuario})
     if user:
-        senha_hash = user["senha"]
+        senha_hash = user.get("senha", "")
         if verificar_senha(senha, senha_hash):
             st.session_state['usuario_logado'] = usuario
             st.session_state['nivel_usuario'] = user.get("nivel", "user")
             return True
     return False
+
+def migrar_senhas_texto_para_hash():
+    usuarios = list(usuarios_col.find())
+    count_atualizados = 0
+
+    for user in usuarios:
+        senha_atual = user.get("senha", "")
+        if not (senha_atual.startswith("$2b$") or senha_atual.startswith("$2a$")):
+            novo_hash = hash_senha(senha_atual)
+            usuarios_col.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"senha": novo_hash.decode('utf-8')}}
+            )
+            count_atualizados += 1
+
+    st.success(f"Migradas {count_atualizados} senhas para hash bcrypt.")
 
 def alerta_estoque():
     pipeline = [
@@ -72,12 +88,7 @@ def enviar_email(destinatario, mensagem):
         msg['To'] = destinatario
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            # Senha do e-mail deve ser guardada em variável de ambiente para segurança
-            senha_email = os.environ.get("EMAIL_SENHA")
-            if senha_email is None:
-                st.error("Senha do e-mail não configurada nas variáveis de ambiente.")
-                return
-            server.login('bibliotecaluizcarlos@gmail.com', senha_email)
+            server.login('bibliotecaluizcarlos@gmail.com', 'terra166')  # Atenção: use senha app!
             server.send_message(msg)
     except Exception as e:
         st.error(f"Erro ao enviar email: {e}")
@@ -116,21 +127,20 @@ st.set_page_config(page_title="Sistema de Fardas", layout="wide")
 st.title("Sistema de Controle de Fardas")
 
 if "logado" not in st.session_state:
-    st.session_state["logado"] = False
+    st.session_state.logado = False
 
-if not st.session_state["logado"]:
+if not st.session_state.logado:
     st.subheader("Login do Sistema")
     with st.form("login"):
         usuario = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
         if st.form_submit_button("Entrar"):
             if autenticar(usuario.strip(), senha.strip()):
-                st.session_state["logado"] = True
+                st.session_state.logado = True
                 st.experimental_rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
 else:
-    # Exibir alertas de estoque baixo e enviar mensagens
     mensagens = alerta_estoque()
     for msg in mensagens:
         st.warning(msg)
@@ -169,6 +179,11 @@ else:
         ]
 
     menu = st.sidebar.selectbox("Menu", opcoes_menu)
+
+    # Botão para migrar senhas - só admin
+    if st.session_state.get("nivel_usuario") == "admin":
+        if st.button("Migrar senhas texto para hash (Admin)"):
+            migrar_senhas_texto_para_hash()
 
     # --- ABA CADASTRO GERAL ---
     if menu == "Cadastro Geral":
@@ -361,37 +376,10 @@ else:
             else:
                 st.info("Nenhum registro encontrado para este aluno.")
 
-    # --- IMPORTAR ALUNOS ---
-    elif menu == "Importar Alunos":
-        st.subheader("Importar Alunos via TXT ou CSV")
-        arquivo = st.file_uploader("Arquivo de alunos", type=["txt", "csv"])
-        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
-        if arquivo:
-            delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
-            try:
-                df_alunos = pd.read_csv(arquivo, delimiter=delimitador_real)
-                st.dataframe(df_alunos)
-                if st.button("Importar Alunos"):
-                    for _, row in df_alunos.iterrows():
-                        alunos_col.update_one(
-                            {"cgm": str(row["cgm"])},
-                            {
-                                "$set": {
-                                    "nome": str(row["nome"]),
-                                    "turma": str(row["turma"])
-                                }
-                            },
-                            upsert=True
-                        )
-                    st.success("Alunos importados com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao importar arquivo: {e}")
-
-    # --- ABA CADASTRO DE USUÁRIOS ---
+    # --- CADASTRO DE USUÁRIOS ---
     elif menu == "Cadastro de Usuários":
         st.subheader("Cadastro e Gerenciamento de Usuários")
 
-        # Buscar usuários no banco
         usuarios = list(usuarios_col.find({}, {"_id": 0, "usuario": 1, "nivel": 1}))
 
         if usuarios:
@@ -418,13 +406,14 @@ else:
 
             if submit:
                 if novo_usuario and nova_senha:
-                    # Verificar se usuário já existe
                     if usuarios_col.find_one({"usuario": novo_usuario}):
                         st.warning("Usuário já existe!")
                     else:
+                        # Salvar senha já hashada
+                        senha_hash = hash_senha(nova_senha).decode('utf-8')
                         usuarios_col.insert_one({
                             "usuario": novo_usuario,
-                            "senha": hash_senha(nova_senha),  # SALVAR SENHA HASHEADA
+                            "senha": senha_hash,
                             "nivel": nivel
                         })
                         st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
@@ -434,7 +423,7 @@ else:
 
     # --- SAIR ---
     elif menu == "🚪 Sair do Sistema":
-        st.session_state["logado"] = False
+        st.session_state.logado = False
         st.session_state.pop('usuario_logado', None)
         st.session_state.pop('nivel_usuario', None)
         st.experimental_rerun()
