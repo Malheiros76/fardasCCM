@@ -158,13 +158,7 @@ else:
             "Importar Alunos",
             "🚪 Sair do Sistema"
         ]
-# --- Exibir imagem no topo do menu lateral ---
-logo_path = "images/logo.png"
 
-if os.path.exists(logo_path):
-    st.sidebar.image(logo_path, use_column_width=True)
-else:
-    st.sidebar.write("Logo não encontrada.")
     menu = st.sidebar.selectbox("Menu", opcoes_menu)
 
     # --- ABA CADASTRO GERAL ---
