@@ -229,21 +229,52 @@ else:
         else:
             st.dataframe(df)
             if st.button("Gerar PDF"):
-                nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-                cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
-                cpdf.setFont("Helvetica-Bold", 16)
-                cpdf.drawString(2*cm, 28*cm, "Relatório de Estoque")
-                y = 26*cm
-                for i, row in df.iterrows():
-                    texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']}"
-                    cpdf.drawString(2*cm, y, texto)
-                    y -= 0.6*cm
-                    if y < 2*cm:
-                        cpdf.showPage()
-                        y = 28*cm
-                cpdf.save()
-                with open(nome_pdf, "rb") as f:
-                    st.download_button("Baixar PDF", f, file_name=nome_pdf)
+    nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+    cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
+
+    # LOGO (opcional)
+    logo_path = "images/CABEÇARIOAPP.png"   # ajuste o caminho se precisar
+    if os.path.exists(logo_path):
+        cpdf.drawImage(logo_path, 2*cm, 26*cm, width=4*cm, height=4*cm, preserveAspectRatio=True)
+
+    # TÍTULO E CABEÇALHO
+    cpdf.setFont("Helvetica-Bold", 14)
+    cpdf.drawString(7*cm, 28*cm, "Escola CCM Luiz Carlos de Paula e Souza")
+
+    cpdf.setFont("Helvetica", 12)
+    cpdf.drawString(7*cm, 27.2*cm, f"Relatório de Estoque de Fardas")
+
+    data_emissao = datetime.now().strftime("%d/%m/%Y %H:%M")
+    cpdf.drawString(7*cm, 26.5*cm, f"Emitido em: {data_emissao}")
+
+    # LINHA DIVISÓRIA
+    cpdf.line(2*cm, 26*cm, 19*cm, 26*cm)
+
+    # TABELA DE DADOS
+    y = 25*cm
+    cpdf.setFont("Helvetica-Bold", 10)
+    cpdf.drawString(2*cm, y, "Produto")
+    cpdf.drawString(8*cm, y, "Entrada")
+    cpdf.drawString(11*cm, y, "Saída")
+    cpdf.drawString(14*cm, y, "Saldo")
+
+    cpdf.setFont("Helvetica", 10)
+    y -= 0.5*cm
+
+    for _, row in df.iterrows():
+        cpdf.drawString(2*cm, y, str(row['produto']))
+        cpdf.drawString(8*cm, y, str(row['entrada']))
+        cpdf.drawString(11*cm, y, str(row['saida']))
+        cpdf.drawString(14*cm, y, str(row['saldo']))
+        y -= 0.5*cm
+        if y < 2*cm:
+            cpdf.showPage()
+            y = 28*cm
+
+    cpdf.save()
+
+    with open(nome_pdf, "rb") as f:
+        st.download_button("Baixar PDF", f, file_name=nome_pdf)
 
     # --- IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
