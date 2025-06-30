@@ -513,7 +513,7 @@ else:
                         "nivel": nivel
                     })
                     st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
-                    st.experimental_rerun()
+                    st.rerun()
 
     elif menu == "🚪 Sair do Sistema":
         st.session_state.logado = False
