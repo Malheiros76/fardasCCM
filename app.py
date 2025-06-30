@@ -255,7 +255,7 @@ else:
                     if y < 2*cm:
                         cpdf.showPage()
                         try:
-                            cpdf.drawImage("CABEÇARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
+                            cpdf.drawImage("CABECARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
                         except:
                             pass
                         cpdf.setFont("Helvetica-Bold", 16)
