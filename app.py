@@ -392,4 +392,4 @@ else:
         st.session_state.logado = False
         st.session_state.pop('usuario_logado', None)
         st.session_state.pop('nivel_usuario', None)
-        st.experimental_rerun()
+        st.rerun()
