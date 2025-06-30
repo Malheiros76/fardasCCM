@@ -118,7 +118,7 @@ if not st.session_state.logado:
         if st.form_submit_button("Entrar"):
             if autenticar(usuario.strip(), senha.strip()):
                 st.session_state.logado = True
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
 else:
@@ -446,4 +446,4 @@ else:
     elif menu == "🚪 Sair do Sistema":
         st.session_state.logado = False
         st.success("Sessão encerrada.")
-        st.experimental_rerun()
+        st.rerun()
