@@ -131,6 +131,13 @@ else:
                 enviar_email(cadastro["email"], msg)
             if cadastro.get("telefone"):
                 enviar_whatsapp(cadastro["telefone"], msg)
+# --- Exibir imagem no topo do menu lateral ---
+logo_path = "images/logo.png"
+
+if os.path.exists(logo_path):
+    st.sidebar.image(logo_path, use_column_width=True)
+else:
+    st.sidebar.write("Logo não encontrada.")
 
     # Menu
     if st.session_state.get("nivel_usuario") == "admin":
