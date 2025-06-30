@@ -10,6 +10,7 @@ import smtplib
 from email.mime.text import MIMEText
 import os
 import bcrypt
+import os
 
 # --- CONFIGURAÇÃO DE MONGO ---
 client = MongoClient("mongodb+srv://bibliotecaluizcarlos:terra166@cluster0.uyvqnek.mongodb.net/?retryWrites=true&w=majority")
@@ -25,9 +26,11 @@ movimentacao_aluno_col = db["movimentacao_aluno"]
 # --- FUNÇÕES AUXILIARES ---
 
 def hash_senha(senha):
-    return bcrypt.hashpw(senha.encode(), bcrypt.gensalt())
+    # Retorna o hash da senha em string para salvar no banco
+    return bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode('utf-8')
 
 def verificar_senha(senha_plain, senha_hash):
+    # Garante que o hash está em bytes para bcrypt
     if isinstance(senha_hash, str):
         senha_hash = senha_hash.encode('utf-8')
     return bcrypt.checkpw(senha_plain.encode(), senha_hash)
@@ -69,7 +72,12 @@ def enviar_email(destinatario, mensagem):
         msg['To'] = destinatario
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login('bibliotecaluizcarlos@gmail.com', 'terra166') # senha app se precisar
+            # Senha do e-mail deve ser guardada em variável de ambiente para segurança
+            senha_email = os.environ.get("EMAIL_SENHA")
+            if senha_email is None:
+                st.error("Senha do e-mail não configurada nas variáveis de ambiente.")
+                return
+            server.login('bibliotecaluizcarlos@gmail.com', senha_email)
             server.send_message(msg)
     except Exception as e:
         st.error(f"Erro ao enviar email: {e}")
@@ -108,20 +116,21 @@ st.set_page_config(page_title="Sistema de Fardas", layout="wide")
 st.title("Sistema de Controle de Fardas")
 
 if "logado" not in st.session_state:
-    st.session_state.logado = False
+    st.session_state["logado"] = False
 
-if not st.session_state.logado:
+if not st.session_state["logado"]:
     st.subheader("Login do Sistema")
     with st.form("login"):
         usuario = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
         if st.form_submit_button("Entrar"):
             if autenticar(usuario.strip(), senha.strip()):
-                st.session_state.logado = True
+                st.session_state["logado"] = True
                 st.experimental_rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
 else:
+    # Exibir alertas de estoque baixo e enviar mensagens
     mensagens = alerta_estoque()
     for msg in mensagens:
         st.warning(msg)
@@ -352,82 +361,80 @@ else:
             else:
                 st.info("Nenhum registro encontrado para este aluno.")
 
-      elif menu == "Cadastro de Usuários":
-..
+    # --- IMPORTAR ALUNOS ---
+    elif menu == "Importar Alunos":
         st.subheader("Importar Alunos via TXT ou CSV")
         arquivo = st.file_uploader("Arquivo de alunos", type=["txt", "csv"])
-    delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
-    if arquivo:
-        delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
-        try:
-            df_alunos = pd.read_csv(arquivo, delimiter=delimitador_real)
-            st.dataframe(df_alunos)
-            if st.button("Importar Alunos"):
-                for _, row in df_alunos.iterrows():
-                    alunos_col.update_one(
-                        {"cgm": str(row["cgm"])},
-                        {
-                            "$set": {
-                                "nome": str(row["nome"]),
-                                "turma": str(row["turma"])
-                            }
-                        },
-                        upsert=True
-                    )
-                st.success("Alunos importados com sucesso!")
-        except Exception as e:
-            st.error(f"Erro ao importar arquivo: {e}")
+        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
+        if arquivo:
+            delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
+            try:
+                df_alunos = pd.read_csv(arquivo, delimiter=delimitador_real)
+                st.dataframe(df_alunos)
+                if st.button("Importar Alunos"):
+                    for _, row in df_alunos.iterrows():
+                        alunos_col.update_one(
+                            {"cgm": str(row["cgm"])},
+                            {
+                                "$set": {
+                                    "nome": str(row["nome"]),
+                                    "turma": str(row["turma"])
+                                }
+                            },
+                            upsert=True
+                        )
+                    st.success("Alunos importados com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao importar arquivo: {e}")
 
     # --- ABA CADASTRO DE USUÁRIOS ---
-elif menu == "Cadastro de Usuários":
-    st.subheader("Cadastro e Gerenciamento de Usuários")
+    elif menu == "Cadastro de Usuários":
+        st.subheader("Cadastro e Gerenciamento de Usuários")
 
-    # Buscar usuários no banco
-    usuarios = list(usuarios_col.find({}, {"_id": 0, "usuario": 1, "nivel": 1}))
+        # Buscar usuários no banco
+        usuarios = list(usuarios_col.find({}, {"_id": 0, "usuario": 1, "nivel": 1}))
 
-    if usuarios:
-        # Garantir campos existentes para não dar erro no DataFrame
-        usuarios_formatados = [
-            {
-                "usuario": u.get("usuario", ""),
-                "nivel": u.get("nivel", "user")
-            }
-            for u in usuarios
-        ]
-        df_usuarios = pd.DataFrame(usuarios_formatados)
-        st.dataframe(df_usuarios)
-    else:
-        st.info("Nenhum usuário cadastrado ainda.")
+        if usuarios:
+            usuarios_formatados = [
+                {
+                    "usuario": u.get("usuario", ""),
+                    "nivel": u.get("nivel", "user")
+                }
+                for u in usuarios
+            ]
+            df_usuarios = pd.DataFrame(usuarios_formatados)
+            st.dataframe(df_usuarios)
+        else:
+            st.info("Nenhum usuário cadastrado ainda.")
 
-    st.markdown("---")
-    st.markdown("### Novo Usuário")
+        st.markdown("---")
+        st.markdown("### Novo Usuário")
 
-    with st.form("form_cadastro_usuario"):
-        novo_usuario = st.text_input("Novo usuário")
-        nova_senha = st.text_input("Senha", type="password")
-        nivel = st.selectbox("Nível", ["admin", "user"])
-        submit = st.form_submit_button("Cadastrar")
+        with st.form("form_cadastro_usuario"):
+            novo_usuario = st.text_input("Novo usuário")
+            nova_senha = st.text_input("Senha", type="password")
+            nivel = st.selectbox("Nível", ["admin", "user"])
+            submit = st.form_submit_button("Cadastrar")
 
-        if submit:
-            if novo_usuario and nova_senha:
-                # Verificar se usuário já existe
-                if usuarios_col.find_one({"usuario": novo_usuario}):
-                    st.warning("Usuário já existe!")
+            if submit:
+                if novo_usuario and nova_senha:
+                    # Verificar se usuário já existe
+                    if usuarios_col.find_one({"usuario": novo_usuario}):
+                        st.warning("Usuário já existe!")
+                    else:
+                        usuarios_col.insert_one({
+                            "usuario": novo_usuario,
+                            "senha": hash_senha(nova_senha),  # SALVAR SENHA HASHEADA
+                            "nivel": nivel
+                        })
+                        st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
+                        st.experimental_rerun()
                 else:
-                    usuarios_col.insert_one({
-                        "usuario": novo_usuario,
-                        "senha": nova_senha,
-                        "nivel": nivel
-                    })
-                    st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
-                    st.rerun()
-            else:
-                st.error("Usuário e senha são obrigatórios.")
-
+                    st.error("Usuário e senha são obrigatórios.")
 
     # --- SAIR ---
     elif menu == "🚪 Sair do Sistema":
-        st.session_state.logado = False
+        st.session_state["logado"] = False
         st.session_state.pop('usuario_logado', None)
         st.session_state.pop('nivel_usuario', None)
-        st.rerun()
+        st.experimental_rerun()
