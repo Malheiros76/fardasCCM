@@ -289,27 +289,27 @@ else:
             except Exception as e:
                 st.error(f"Erro ao importar arquivo: {e}")
 
-    # --- ABA ALUNOS ---
-    elif menu == "Alunos":
-        st.subheader("Registro de Entrega de Fardas aos Alunos")
+            elif menu == "Alunos":
+                st.subheader("Registro de Entrega de Fardas aos Alunos")
+            
+                alunos = list(alunos_col.find())
+                nomes_alunos = [a["nome"] for a in alunos] if alunos else []
+            
+                aluno_nome = st.selectbox("Aluno", nomes_alunos)
+            
+                # Buscar os dados do aluno selecionado
+                aluno_selecionado = next((a for a in alunos if a["nome"] == aluno_nome), None)
+            
+                if aluno_selecionado:
+                    turma = aluno_selecionado.get("turma", "Sem turma")
+                    cgm = aluno_selecionado.get("cgm", "Sem CGM")
+                    sexo = aluno_selecionado.get("sexo", "Não informado")
+            
+                    # Exibir informações
+                    st.write(f"**Turma:** {turma}")
+                    st.write(f"**CGM:** {cgm}")
+                    st.write(f"**Sexo:** {sexo}")
 
-        alunos = list(alunos_col.find())
-        nomes_alunos = [a["nome"] for a in alunos] if alunos else []
-
-        aluno_nome = st.selectbox("Aluno", nomes_alunos)
-        turma = ""
-        cgm = ""
-        sexo = ""
-
-        if aluno_nome:
-            aluno_data = alunos_col.find_one({"nome": aluno_nome})
-            turma = aluno_data.get("turma", "")
-            cgm = aluno_data.get("cgm", "")
-            sexo = aluno_data.get("sexo", "").lower()
-
-        st.text(f"CGM: {cgm}")
-        st.text(f"Turma: {turma}")
-        st.text(f"Sexo: {sexo.upper() if sexo else ''}")
 
         # Lista de produtos (imagens)
         pecas = [
