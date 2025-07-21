@@ -289,7 +289,7 @@ else:
             except Exception as e:
                 st.error(f"Erro ao importar arquivo: {e}")
 
-            elif menu == "Alunos":
+    elif menu == "Alunos":
                 st.subheader("Registro de Entrega de Fardas aos Alunos")
             
                 alunos = list(alunos_col.find())
