@@ -242,8 +242,9 @@ else:
         else:
             st.dataframe(df)
             from reportlab.lib.pagesizes import A4, landscape
-   if st.button("Gerar PDF"):
-    nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+       if st.button("Gerar PDF"):
+    
+           nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
     
     doc = SimpleDocTemplate(nome_pdf, pagesize=landscape(A4),
                             rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
