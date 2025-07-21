@@ -290,17 +290,17 @@ else:
                 st.error(f"Erro ao importar arquivo: {e}")
 
     elif menu == "Alunos":
-                st.subheader("Registro de Entrega de Fardas aos Alunos")
+        st.subheader("Registro de Entrega de Fardas aos Alunos")
             
-                alunos = list(alunos_col.find())
-                nomes_alunos = [a["nome"] for a in alunos] if alunos else []
+        alunos = list(alunos_col.find())
+        nomes_alunos = [a["nome"] for a in alunos] if alunos else []
             
-                aluno_nome = st.selectbox("Aluno", nomes_alunos)
+        aluno_nome = st.selectbox("Aluno", nomes_alunos)
+         
+# Buscar os dados do aluno selecionado
+        aluno_selecionado = next((a for a in alunos if a["nome"] == aluno_nome), None)
             
-                # Buscar os dados do aluno selecionado
-                aluno_selecionado = next((a for a in alunos if a["nome"] == aluno_nome), None)
-            
-                if aluno_selecionado:
+        if aluno_selecionado:
                     turma = aluno_selecionado.get("turma", "Sem turma")
                     cgm = aluno_selecionado.get("cgm", "Sem CGM")
                     sexo = aluno_selecionado.get("sexo", "Não informado")
