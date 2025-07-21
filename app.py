@@ -239,7 +239,40 @@ else:
         else:
             st.dataframe(df)
             from reportlab.lib.pagesizes import A4, landscape
-
+    if st.button("Gerar PDF"):
+        nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+        
+        # Define a página como A4 deitada
+        cpdf = canvas.Canvas(nome_pdf, pagesize=landscape(A4))
+    
+        try:
+            cpdf.drawImage("cabeca.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
+        except:
+            pass
+    
+        cpdf.setFont("Helvetica-Bold", 16)
+        cpdf.drawString(2*cm, 15*cm, "Relatório de Estoque")
+    
+        y = 13*cm  # posição vertical inicial, ajustada para paisagem
+        for i, row in df.iterrows():
+            texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']}"
+            cpdf.drawString(2*cm, y, texto)
+            y -= 0.6*cm
+            if y < 2*cm:
+                cpdf.showPage()
+                try:
+                    cpdf.drawImage("CABECARIOAPP.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
+                except:
+                    pass
+                cpdf.setFont("Helvetica-Bold", 16)
+                cpdf.drawString(2*cm, 15*cm, "Relatório de Estoque (Continuação)")
+                y = 13*cm
+    
+        cpdf.save()
+    
+        with open(nome_pdf, "rb") as f:
+            st.download_button("Baixar PDF", f, file_name=nome_pdf)
+            
     # --- ABA IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
         st.subheader("Importar Estoque via TXT ou CSV")
