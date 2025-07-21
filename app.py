@@ -242,9 +242,9 @@ else:
         else:
             st.dataframe(df)
             from reportlab.lib.pagesizes import A4, landscape
-       if st.button("Gerar PDF"):
+            if st.button("Gerar PDF"):
     
-           nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+                nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
     
     doc = SimpleDocTemplate(nome_pdf, pagesize=landscape(A4),
                             rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
@@ -253,8 +253,7 @@ else:
 
     # Define a página como A4 deitada
     cpdf = canvas.Canvas(nome_pdf, pagesize=landscape(A4))
-    try:
-        cpdf.drawImage("cabeca.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
+    cpdf.drawImage("cabeca.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
     for _, row in df.iterrows():
         dados.append([row['produto'], row['entrada'], row['saida'], row['saldo']])
 
@@ -277,10 +276,10 @@ else:
             
     # --- ABA IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
-        st.subheader("Importar Estoque via TXT ou CSV")
-        arquivo = st.file_uploader("Arquivo", type=["txt", "csv"])
-        delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
-        if arquivo:
+    st.subheader("Importar Estoque via TXT ou CSV")
+    arquivo = st.file_uploader("Arquivo", type=["txt", "csv"])
+    delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
+    if arquivo:
             delimitador_real = {";": ";", ",": ",", "\\t": "\t"}[delimitador]
             try:
                 df = pd.read_csv(arquivo, delimiter=delimitador_real)
