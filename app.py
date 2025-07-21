@@ -233,7 +233,7 @@ else:
         else:
             st.info("Nenhum dado de movimentação encontrado.")
 
-    # --- ABA RELATÓRIOS ---    
+# --- ABA RELATÓRIOS ---
     elif menu == "Relatórios":
         st.subheader("Relatórios de Estoque")
         df = calcular_estoque()
@@ -241,42 +241,36 @@ else:
             st.info("Nenhum dado para gerar relatório.")
         else:
             st.dataframe(df)
-            from reportlab.lib.pagesizes import A4, landscape
             if st.button("Gerar PDF"):
-    
                 nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-    
-    doc = SimpleDocTemplate(nome_pdf, pagesize=landscape(A4),
-                            rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-
-    elementos = []
-
-    # Define a página como A4 deitada
-    cpdf = canvas.Canvas(nome_pdf, pagesize=landscape(A4))
-    cpdf.drawImage("cabeca.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
-    for _, row in df.iterrows():
-        dados.append([row['produto'], row['entrada'], row['saida'], row['saldo']])
-
-    # Tabela
-    tabela = Table(dados, colWidths=[10*cm, 4*cm, 4*cm, 4*cm])
-    tabela.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-    ]))
-
-    elementos.append(tabela)
-    doc.build(elementos)
-
-    with open(nome_pdf, "rb") as f:
-        st.download_button("Baixar PDF", f, file_name=nome_pdf)
+                cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
+                try:
+                    cpdf.drawImage("cabeca.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
+                except:
+                    pass
+                cpdf.setFont("Helvetica-Bold", 16)
+                cpdf.drawString(2*cm, 24*cm, "Relatório de Estoque")
+                y = 22*cm
+                for i, row in df.iterrows():
+                    texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']}"
+                    cpdf.drawString(2*cm, y, texto)
+                    y -= 0.6*cm
+                    if y < 2*cm:
+                        cpdf.showPage()
+                        try:
+                            cpdf.drawImage("CABECARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
+                        except:
+                            pass
+                        cpdf.setFont("Helvetica-Bold", 16)
+                        cpdf.drawString(2*cm, 24*cm, "Relatório de Estoque (Continuação)")
+                        y = 22*cm
+                cpdf.save()
+                with open(nome_pdf, "rb") as f:
+                    st.download_button("Baixar PDF", f, file_name=nome_pdf)
             
     # --- ABA IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
-    st.subheader("Importar Estoque via TXT ou CSV")
+        st.subheader("Importar Estoque via TXT ou CSV")
     arquivo = st.file_uploader("Arquivo", type=["txt", "csv"])
     delimitador = st.selectbox("Delimitador", [";", ",", "\\t"])
     if arquivo:
