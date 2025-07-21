@@ -242,15 +242,7 @@ else:
         else:
             st.dataframe(df)
             from reportlab.lib.pagesizes import A4, landscape
-    if st.button("Gerar PDF"):
-        nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-        
-        # Define a página como A4 deitada
-        cpdf = canvas.Canvas(nome_pdf, pagesize=landscape(A4))
-    
-        try:
-            cpdf.drawImage("cabeca.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
-       if st.button("Gerar PDF"):
+   if st.button("Gerar PDF"):
     nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
     
     doc = SimpleDocTemplate(nome_pdf, pagesize=landscape(A4),
@@ -258,8 +250,10 @@ else:
 
     elementos = []
 
-    # Cabeçalho do relatório (manual com canvas opcional)
-    dados = [["Produto", "Entrada", "Saída", "Saldo"]]
+    # Define a página como A4 deitada
+    cpdf = canvas.Canvas(nome_pdf, pagesize=landscape(A4))
+    try:
+        cpdf.drawImage("cabeca.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
     for _, row in df.iterrows():
         dados.append([row['produto'], row['entrada'], row['saida'], row['saldo']])
 
