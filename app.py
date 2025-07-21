@@ -10,6 +10,9 @@ from email.mime.text import MIMEText
 import os
 import bcrypt
 from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import Table, TableStyle, SimpleDocTemplate
+from reportlab.lib import colors
+import pandas as pd
 
 # --- CONFIGURAÇÃO DE MONGO ---
 client = MongoClient("mongodb+srv://bibliotecaluizcarlos:terra166@cluster0.uyvqnek.mongodb.net/?retryWrites=true&w=majority")
@@ -247,31 +250,35 @@ else:
     
         try:
             cpdf.drawImage("cabeca.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
-        except:
-            pass
+       if st.button("Gerar PDF"):
+    nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
     
-        cpdf.setFont("Helvetica-Bold", 16)
-        cpdf.drawString(2*cm, 15*cm, "Relatório de Estoque")
-    
-        y = 13*cm  # posição vertical inicial, ajustada para paisagem
-        for i, row in df.iterrows():
-            texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']}"
-            cpdf.drawString(2*cm, y, texto)
-            y -= 0.6*cm
-            if y < 2*cm:
-                cpdf.showPage()
-                try:
-                    cpdf.drawImage("CABECARIOAPP.png", 2*cm, 18*cm, width=24*cm, height=3*cm)
-                except:
-                    pass
-                cpdf.setFont("Helvetica-Bold", 16)
-                cpdf.drawString(2*cm, 15*cm, "Relatório de Estoque (Continuação)")
-                y = 13*cm
-    
-        cpdf.save()
-    
-        with open(nome_pdf, "rb") as f:
-            st.download_button("Baixar PDF", f, file_name=nome_pdf)
+    doc = SimpleDocTemplate(nome_pdf, pagesize=landscape(A4),
+                            rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+
+    elementos = []
+
+    # Cabeçalho do relatório (manual com canvas opcional)
+    dados = [["Produto", "Entrada", "Saída", "Saldo"]]
+    for _, row in df.iterrows():
+        dados.append([row['produto'], row['entrada'], row['saida'], row['saldo']])
+
+    # Tabela
+    tabela = Table(dados, colWidths=[10*cm, 4*cm, 4*cm, 4*cm])
+    tabela.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+
+    elementos.append(tabela)
+    doc.build(elementos)
+
+    with open(nome_pdf, "rb") as f:
+        st.download_button("Baixar PDF", f, file_name=nome_pdf)
             
     # --- ABA IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
