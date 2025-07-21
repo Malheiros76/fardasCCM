@@ -311,16 +311,16 @@ else:
                     st.write(f"**Sexo:** {sexo}")
 
 
-        # Lista de produtos (imagens)
-        pecas = [
-            "boina.png",
-            "calça_farda.png",
-            "camisa.png",
-            "camisa_farda.png",
-            "conjunto_abrigo.png",
-            "jaqueta_farda.png",
-            "moleton_abrigo.png"
-        ]
+                    # Lista de produtos (imagens)
+                    pecas = [
+                        "boina.png",
+                        "calça_farda.png",
+                        "camisa.png",
+                        "camisa_farda.png",
+                        "conjunto_abrigo.png",
+                        "jaqueta_farda.png",
+                        "moleton_abrigo.png"
+                    ]
 
         # Dicionário dos tamanhos por produto e sexo
         tamanhos = {
