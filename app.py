@@ -3,13 +3,13 @@ from pymongo import MongoClient
 from datetime import datetime
 import pandas as pd
 import urllib.parse
-from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 import smtplib
 from email.mime.text import MIMEText
 import os
 import bcrypt
+from reportlab.lib.pagesizes import A4, landscape
 
 # --- CONFIGURAÇÃO DE MONGO ---
 client = MongoClient("mongodb+srv://bibliotecaluizcarlos:terra166@cluster0.uyvqnek.mongodb.net/?retryWrites=true&w=majority")
@@ -230,7 +230,7 @@ else:
         else:
             st.info("Nenhum dado de movimentação encontrado.")
 
-    # --- ABA RELATÓRIOS ---
+    # --- ABA RELATÓRIOS ---    
     elif menu == "Relatórios":
         st.subheader("Relatórios de Estoque")
         df = calcular_estoque()
@@ -238,32 +238,7 @@ else:
             st.info("Nenhum dado para gerar relatório.")
         else:
             st.dataframe(df)
-            if st.button("Gerar PDF"):
-                nome_pdf = f"relatorio_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-                cpdf = canvas.Canvas(nome_pdf, pagesize=A4)
-                try:
-                    cpdf.drawImage("CABECARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
-                except:
-                    pass
-                cpdf.setFont("Helvetica-Bold", 16)
-                cpdf.drawString(2*cm, 24*cm, "Relatório de Estoque")
-                y = 22*cm
-                for i, row in df.iterrows():
-                    texto = f"{row['produto']} - Entrada: {row['entrada']} - Saída: {row['saida']} - Saldo: {row['saldo']}"
-                    cpdf.drawString(2*cm, y, texto)
-                    y -= 0.6*cm
-                    if y < 2*cm:
-                        cpdf.showPage()
-                        try:
-                            cpdf.drawImage("CABECARIOAPP.png", 2*cm, 27*cm, width=16*cm, height=3*cm)
-                        except:
-                            pass
-                        cpdf.setFont("Helvetica-Bold", 16)
-                        cpdf.drawString(2*cm, 24*cm, "Relatório de Estoque (Continuação)")
-                        y = 22*cm
-                cpdf.save()
-                with open(nome_pdf, "rb") as f:
-                    st.download_button("Baixar PDF", f, file_name=nome_pdf)
+            from reportlab.lib.pagesizes import A4, landscape
 
     # --- ABA IMPORTAR ESTOQUE ---
     elif menu == "Importar Estoque":
